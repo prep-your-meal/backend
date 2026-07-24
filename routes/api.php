@@ -6,8 +6,9 @@ use App\Http\Controllers\Api\ShoppingListController;
 use App\Http\Controllers\Api\SystemController;
 use App\Http\Controllers\Api\WebhookController;
 use Illuminate\Support\Facades\Route;
+use L5Swagger\Http\Controllers\SwaggerController;
 
-// --- ÖFFENTLICHE ROUTEN ---
+// --- Public routes ---
 Route::get('/version', [SystemController::class, 'version']);
 
 // Auth & Socialite
@@ -18,7 +19,44 @@ Route::get('/auth/{provider}/callback', [AuthController::class, 'handleProviderC
 // GitHub Webhook
 Route::post('/webhooks/github', [WebhookController::class, 'handle']);
 
-// --- GESCHÜTZTE ROUTEN (Benötigen ein Sanctum-Token) ---
+/*
+|--------------------------------------------------------------------------
+| Shared hosting environment FIX: Swagger UI Assets & Documentation
+|--------------------------------------------------------------------------
+|
+| Manually serve Swagger UI assets and the generated JSON documentation
+| under the /api prefix. This ensures compatibility with shared hosting
+| subfolder routing and bypasses strict open_basedir restrictions.
+|
+*/
+
+// Serve Swagger assets (CSS, JS, PNG)
+Route::get('/docs/asset/{asset}', function ($asset) {
+    // Access the physically copied files inside the public directory
+    $path = public_path("docs/asset/{$asset}");
+
+    if (file_exists($path)) {
+        // Determine the correct MIME type for the requested asset
+        $extension = pathinfo($path, PATHINFO_EXTENSION);
+        $mime = match ($extension) {
+            'css' => 'text/css',
+            'js' => 'application/javascript',
+            'png' => 'image/png',
+            default => 'text/plain'
+        };
+
+        // Return the static file
+        return response()->file($path, ['Content-Type' => $mime]);
+    }
+
+    // Return a 404 JSend response if the asset is missing
+    abort(404);
+});
+
+// Serve the generated JSON documentation for Swagger
+Route::get('/docs', [SwaggerController::class, 'docs']);
+
+// --- Protected routes ---
 Route::middleware('auth:sanctum')->group(function () {
 
     // Meal Plan
