@@ -1,0 +1,104 @@
+name: Deploy to Webspace
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH & Configure Environment
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.WEBSPACE_HOST }}
+          username: ${{ secrets.WEBSPACE_USER }}
+          password: ${{ secrets.WEBSPACE_PASSWORD }}
+          port: ${{ secrets.WEBSPACE_PORT || 22 }}
+          envs: DB_HOST,DB_DATABASE,DB_USERNAME,DB_PASSWORD,APP_URL,GITHUB_TOKEN,WEBSPACE_TARGET_DIR,MAIL_HOST,MAIL_PORT,MAIL_USERNAME,MAIL_PASSWORD,MAIL_FROM_ADDRESS
+          script: |
+            # Set target directory from secret environment variable
+            TARGET_DIR="$WEBSPACE_TARGET_DIR"
+
+            # Check if the repository already exists
+            if [ ! -d "$TARGET_DIR/.git" ]; then
+                echo "Repository not found on server. Initializing clone..."
+                mkdir -p "$TARGET_DIR"
+                cd "$TARGET_DIR"
+                # Initial clone using GitHub token (if the repo is private)
+                git clone https://x-access-token:$GITHUB_TOKEN@github.com/${{ github.repository }}.git .
+            else
+                echo "Repository exists. Pulling latest changes..."
+                cd "$TARGET_DIR"
+                git pull origin main
+            fi
+
+            # Install production Composer dependencies
+            composer install --no-dev --optimize-autoloader --no-interaction
+
+            # Build the .env file dynamically from secrets
+            cat << EOF > .env
+            APP_NAME="PrepYourMeal API"
+            APP_ENV=production
+            APP_KEY=
+            APP_DEBUG=false
+            APP_URL=$APP_URL
+
+            APP_LOCALE=en
+            APP_FALLBACK_LOCALE=en
+            APP_FAKER_LOCALE=en_US
+
+            APP_MAINTENANCE_DRIVER=file
+            BCRYPT_ROUNDS=12
+
+            LOG_CHANNEL=stack
+            LOG_STACK=single
+            LOG_DEPRECATIONS_CHANNEL=null
+            LOG_LEVEL=error
+
+            DB_CONNECTION=mysql
+            DB_HOST=$DB_HOST
+            DB_PORT=3306
+            DB_DATABASE=$DB_DATABASE
+            DB_USERNAME=$DB_USERNAME
+            DB_PASSWORD=$DB_PASSWORD
+
+            SESSION_DRIVER=file
+            SESSION_LIFETIME=120
+            SESSION_ENCRYPT=false
+            SESSION_PATH=/
+            SESSION_DOMAIN=null
+
+            BROADCAST_CONNECTION=log
+            FILESYSTEM_DISK=local
+            QUEUE_CONNECTION=sync
+
+            CACHE_STORE=file
+
+            MAIL_MAILER=smtp
+            MAIL_SCHEME=null
+            MAIL_HOST=$MAIL_HOST
+            MAIL_PORT=$MAIL_PORT
+            MAIL_USERNAME=$MAIL_USERNAME
+            MAIL_PASSWORD=$MAIL_PASSWORD
+            MAIL_FROM_ADDRESS="$MAIL_FROM_ADDRESS"
+            MAIL_FROM_NAME="\${APP_NAME}"
+            EOF
+
+            # Generate app key if not already set
+            if ! grep -q "APP_KEY=base64" .env || grep -q "APP_KEY=$" .env; then
+                php artisan key:generate --force
+            fi
+
+            # Run Laravel optimizations and database migrations
+            php artisan config:cache
+            php artisan route:cache
+            php artisan view:cache
+            php artisan migrate --force
+
+            # Secure file permissions for shared hosting
+            chmod -R 775 storage bootstrap/cache
