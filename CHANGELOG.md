@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.2.2](https://github.com/prep-your-meal/backend/compare/v1.2.1...v1.2.2) (2026-07-24)
+
+
+### Bug Fixes
+
+* **swagger:** restore StandaloneLayout and hide topbar via css to prevent definition error ([a8d1e9d](https://github.com/prep-your-meal/backend/commit/a8d1e9d9869f704e759aaeed4395becfd48e00d9))
+
 ## [1.2.1](https://github.com/prep-your-meal/backend/compare/v1.2.0...v1.2.1) (2026-07-24)
 
 ## [1.2.0](https://github.com/prep-your-meal/backend/compare/v1.1.0...v1.2.0) (2026-07-24)
