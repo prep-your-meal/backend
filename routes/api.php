@@ -60,6 +60,22 @@ Route::get('/docs/{file?}', function ($file = 'api-docs.json') {
     abort(404, 'Swagger documentation JSON not found.');
 });
 
+// Serve general information about the api
+Route::get('/', function () {
+    return response()->json([
+        'status' => 'success',
+        'data' => [
+            'name' => config('app.name'),
+            'environment' => config('app.env'),
+            'status' => 'running',
+            'documentation' => url('/documentation'),
+            'version' => file_exists(base_path('version.txt'))
+        ? trim(file_get_contents(base_path('version.txt')))
+        : 'latest',
+        ],
+    ]);
+});
+
 // --- Protected routes ---
 Route::middleware('auth:sanctum')->group(function () {
 

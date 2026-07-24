@@ -2,19 +2,20 @@
 
 use Illuminate\Support\Facades\Route;
 
-$version = file_exists(base_path('version.txt'))
-        ? trim(file_get_contents(base_path('version.txt')))
-        : 'latest';
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+|
+| Here is where you can register web routes for your application. These
+| routes are loaded by the RouteServiceProvider and all of them will
+| be assigned to the "web" middleware group.
+|
+*/
 
 Route::get('/', function () {
     return response()->json([
-        'status' => 'success',
-        'data' => [
-            'name' => config('app.name'),
-            'environment' => config('app.env'),
-            'status' => 'running',
-            'documentation' => url('/documentation'),
-            'version' => $version,
-        ],
-    ]);
+        'status' => 'error',
+        'message' => 'Not Found. Please use the /api endpoint.',
+    ], 404);
 });
