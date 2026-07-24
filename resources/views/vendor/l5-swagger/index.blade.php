@@ -27,6 +27,9 @@
     </style>
     @if(config('l5-swagger.defaults.ui.display.dark_mode'))
         <style>
+            .swagger-ui .topbar {
+                display: none !important;
+            }
             body#dark-mode,
             #dark-mode .scheme-container {
                 background: #1b1b1b;
@@ -153,7 +156,7 @@
                 SwaggerUIBundle.plugins.DownloadUrl
             ],
 
-            layout: "BaseLayout",
+            layout: "StandaloneLayout",
             docExpansion : "{!! config('l5-swagger.defaults.ui.display.doc_expansion', 'none') !!}",
             deepLinking: true,
             filter: {!! config('l5-swagger.defaults.ui.display.filter') ? 'true' : 'false' !!},
