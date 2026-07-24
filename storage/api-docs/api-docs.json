@@ -5,6 +5,12 @@
         "description": "API documentation and testing interface for PrepYourMeal.",
         "version": "1.0.0"
     },
+    "servers": [
+        {
+            "url": "http://localhost/api",
+            "description": "API Server"
+        }
+    ],
     "paths": {
         "/auth/login": {
             "post": {
