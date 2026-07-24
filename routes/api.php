@@ -6,7 +6,6 @@ use App\Http\Controllers\Api\ShoppingListController;
 use App\Http\Controllers\Api\SystemController;
 use App\Http\Controllers\Api\WebhookController;
 use Illuminate\Support\Facades\Route;
-use L5Swagger\Http\Controllers\SwaggerController;
 
 // --- Public routes ---
 Route::get('/version', [SystemController::class, 'version']);
@@ -53,8 +52,17 @@ Route::get('/docs/asset/{asset}', function ($asset) {
     abort(404);
 });
 
-// Serve the generated JSON documentation for Swagger
-Route::get('/docs', [SwaggerController::class, 'docs']);
+// Serve the generated JSON documentation for Swagger (static file bypass)
+Route::get('/docs/{file?}', function ($file = 'api-docs.json') {
+    // Greift auf die kopierte JSON-Datei im public-Ordner zu
+    $path = public_path("docs/{$file}");
+
+    if (file_exists($path)) {
+        return response()->file($path, ['Content-Type' => 'application/json']);
+    }
+
+    abort(404, 'Swagger documentation JSON not found.');
+});
 
 // --- Protected routes ---
 Route::middleware('auth:sanctum')->group(function () {

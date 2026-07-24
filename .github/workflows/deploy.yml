@@ -131,6 +131,9 @@ jobs:
             if [ -d "vendor/swagger-api/swagger-ui/dist" ]; then
                 cp -R vendor/swagger-api/swagger-ui/dist/* public/docs/asset/
             fi
+            if [ -d "storage/api-docs" ]; then
+                cp -R storage/api-docs/* public/docs/
+            fi
 
             # Secure file permissions for shared hosting
             chmod -R 775 storage bootstrap/cache
