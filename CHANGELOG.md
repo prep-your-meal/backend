@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.0.2](https://github.com/prep-your-meal/backend/compare/v1.0.1...v1.0.2) (2026-07-24)
+
+
+### Bug Fixes
+
+* move root endpoint back to api routes to restore /api prefix ([1897f8c](https://github.com/prep-your-meal/backend/commit/1897f8c192e9b349dc8986a8a2e89ad312e6ddb2))
+
 ## 1.0.1 (2026-07-24)
 
 
