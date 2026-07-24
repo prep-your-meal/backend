@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use OpenApi\Attributes as OA;
 
 #[OA\Info(
-    version: '1.0.0',
+    version: \API_VERSION,
     description: 'API documentation and testing interface for PrepYourMeal.',
     title: 'PrepYourMeal API'
 )]

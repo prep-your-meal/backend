@@ -69,9 +69,7 @@ Route::get('/', function () {
             'environment' => config('app.env'),
             'status' => 'running',
             'documentation' => url('/documentation'),
-            'version' => file_exists(base_path('version.txt'))
-        ? trim(file_get_contents(base_path('version.txt')))
-        : 'latest',
+            'version' => API_VERSION,
         ],
     ]);
 });
