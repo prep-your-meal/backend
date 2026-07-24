@@ -36,7 +36,7 @@ jobs:
           script: |
             TARGET_DIR="$WEBSPACE_TARGET_DIR"
 
-            # 1. Define correct PHP CLI binary for Strato based on your logs
+            # Define correct PHP CLI binary for Strato based on your logs
             PHP_BIN="/opt/RZphp83/bin/php-cli"
             if [ ! -f "$PHP_BIN" ]; then
                 # Fallback just in case the path changes
@@ -50,12 +50,14 @@ jobs:
                 cd "$TARGET_DIR"
                 git clone https://x-access-token:$GITHUB_TOKEN@github.com/${{ github.repository }}.git .
             else
-                echo "Repository exists. Pulling latest changes..."
+                echo "Repository exists. Enforcing strict sync with main branch..."
                 cd "$TARGET_DIR"
-                git pull origin main
+                git fetch origin main
+                git clean -fd
+                git reset --hard origin/main
             fi
 
-            # 2. Download local Composer if it does not exist
+            # Download local Composer if it does not exist
             if [ ! -f "composer.phar" ]; then
                 echo "Composer not found. Downloading composer.phar..."
                 curl -sS https://getcomposer.org/installer | $PHP_BIN

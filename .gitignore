@@ -6,6 +6,7 @@
 /public/build
 /public/hot
 /public/storage
+public/docs/
 
 # Local Environment & Keys (NEVER COMMIT!)
 .env
@@ -24,6 +25,7 @@
 !/storage/framework/views/.gitignore
 /storage/logs/*
 !/storage/logs/.gitignore
+storage/api-docs/
 .phpunit.result.cache
 
 # Docker / Sail
