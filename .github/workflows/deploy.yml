@@ -128,6 +128,10 @@ jobs:
 
             # Generate api docs
             $PHP_BIN artisan l5-swagger:generate
+            mkdir -p public/docs/asset
+            if [ -d "vendor/swagger-api/swagger-ui/dist" ]; then
+                cp -R vendor/swagger-api/swagger-ui/dist/* public/docs/asset/
+            fi
 
             # Secure file permissions for shared hosting
             chmod -R 775 storage bootstrap/cache
