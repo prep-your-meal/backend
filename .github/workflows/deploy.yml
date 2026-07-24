@@ -71,6 +71,8 @@ jobs:
             APP_KEY=
             APP_DEBUG=false
             APP_URL=$APP_URL
+            ASSET_URL=$APP_URL
+            L5_SWAGGER_CONST_HOST=$APP_URL
 
             APP_LOCALE=en
             APP_FALLBACK_LOCALE=en
@@ -123,6 +125,9 @@ jobs:
             $PHP_BIN artisan route:cache
             $PHP_BIN artisan view:cache
             $PHP_BIN artisan migrate --force
+
+            # Generate api docs
+            $PHP_BIN artisan l5-swagger:generate
 
             # Secure file permissions for shared hosting
             chmod -R 775 storage bootstrap/cache
