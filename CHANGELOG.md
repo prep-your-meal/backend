@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.2.0](https://github.com/prep-your-meal/backend/compare/v1.1.0...v1.2.0) (2026-07-24)
+
+
+### Features
+
+* customize swagger ui theme and hide server signatures in htaccess ([b17b210](https://github.com/prep-your-meal/backend/commit/b17b210a0c72cfc1544bc0b4e1362eaa6d5dda4e))
+
 ## [1.1.0](https://github.com/prep-your-meal/backend/compare/v1.0.2...v1.1.0) (2026-07-24)
 
 
