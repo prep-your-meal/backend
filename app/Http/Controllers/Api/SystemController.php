@@ -19,7 +19,7 @@ use OpenApi\Attributes as OA;
 class SystemController extends Controller
 {
     #[OA\Get(
-        path: '/api/version',
+        path: '/version',
         summary: 'Get the current API version',
         description: 'Reads the version hash directly from the version.txt file.',
         tags: ['System']

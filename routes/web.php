@@ -6,6 +6,6 @@ Route::get('/', function () {
     return response()->json([
         'name' => 'PrepYourMeal API',
         'status' => 'running',
-        'documentation' => url('/api/documentation'),
+        'documentation' => url('/documentation'),
     ]);
 });

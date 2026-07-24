@@ -13,7 +13,7 @@ use OpenApi\Attributes as OA;
 class AuthController extends Controller
 {
     #[OA\Post(
-        path: '/api/auth/login',
+        path: '/auth/login',
         summary: 'Local password login (for testing)',
         tags: ['Auth']
     )]
@@ -56,7 +56,7 @@ class AuthController extends Controller
     }
 
     #[OA\Get(
-        path: '/api/auth/{provider}/redirect',
+        path: '/auth/{provider}/redirect',
         summary: 'Get the OAuth redirect URL for the frontend',
         tags: ['Auth']
     )]
@@ -78,7 +78,7 @@ class AuthController extends Controller
     }
 
     #[OA\Get(
-        path: '/api/auth/{provider}/callback',
+        path: '/auth/{provider}/callback',
         summary: 'Handle OAuth callback from provider',
         tags: ['Auth']
     )]

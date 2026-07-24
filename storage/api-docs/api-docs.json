@@ -6,13 +6,13 @@
         "version": "1.0.0"
     },
     "paths": {
-        "/api/auth/login": {
+        "/auth/login": {
             "post": {
                 "tags": [
                     "Auth"
                 ],
                 "summary": "Local password login (for testing)",
-                "operationId": "dd51a484b7fa0f97c7680fdbde14cf5f",
+                "operationId": "99d66635c4992aeaa6aa44ff653d0563",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -46,13 +46,13 @@
                 }
             }
         },
-        "/api/auth/{provider}/redirect": {
+        "/auth/{provider}/redirect": {
             "get": {
                 "tags": [
                     "Auth"
                 ],
                 "summary": "Get the OAuth redirect URL for the frontend",
-                "operationId": "a056a975024516894ed584b37735aaae",
+                "operationId": "c7031d1ebe15dc495bb564836d13e6ce",
                 "parameters": [
                     {
                         "name": "provider",
@@ -74,13 +74,13 @@
                 }
             }
         },
-        "/api/auth/{provider}/callback": {
+        "/auth/{provider}/callback": {
             "get": {
                 "tags": [
                     "Auth"
                 ],
                 "summary": "Handle OAuth callback from provider",
-                "operationId": "cddf551d3b6e72e7b88f1e884cb3c79a",
+                "operationId": "f4cc2f01c0cd520f583d75d9b4600daa",
                 "parameters": [
                     {
                         "name": "provider",
@@ -102,13 +102,13 @@
                 }
             }
         },
-        "/api/plan": {
+        "/plan": {
             "get": {
                 "tags": [
                     "Meal Plan"
                 ],
                 "summary": "Get the currently active meal plan",
-                "operationId": "dcf73944bf9abf932a6dd42818b453e3",
+                "operationId": "96e3394c6ed9a5c8a0416f1a5b48fe83",
                 "responses": {
                     "200": {
                         "description": "Current meal plan data"
@@ -121,13 +121,13 @@
                 ]
             }
         },
-        "/api/plan/generate": {
+        "/plan/generate": {
             "post": {
                 "tags": [
                     "Meal Plan"
                 ],
                 "summary": "Generate a new 7-day meal plan",
-                "operationId": "442369302e2dfea4c889ae1f7b932a99",
+                "operationId": "9c792e3e445b1d853dfbea7f52d268ee",
                 "responses": {
                     "200": {
                         "description": "Generated meal plan"
@@ -143,13 +143,13 @@
                 ]
             }
         },
-        "/api/shopping-list": {
+        "/shopping-list": {
             "get": {
                 "tags": [
                     "Shopping"
                 ],
                 "summary": "Get the smart shopping list",
-                "operationId": "f82fe9f8304abad859645dd9d4737f1f",
+                "operationId": "7b8ae419230f29c2323de9dbc985b108",
                 "parameters": [
                     {
                         "name": "portions",
@@ -174,14 +174,14 @@
                 ]
             }
         },
-        "/api/version": {
+        "/version": {
             "get": {
                 "tags": [
                     "System"
                 ],
                 "summary": "Get the current API version",
                 "description": "Reads the version hash directly from the version.txt file.",
-                "operationId": "8bffb6bef481d404c3fd62b5b9a3e895",
+                "operationId": "7c2a07f83d029ec82d165f1a255a9e62",
                 "responses": {
                     "200": {
                         "description": "Returns the current version string"
@@ -189,13 +189,13 @@
                 }
             }
         },
-        "/api/webhooks/github": {
+        "/webhooks/github": {
             "post": {
                 "tags": [
                     "System"
                 ],
                 "summary": "Synchronize recipes from GitHub",
-                "operationId": "9adb8617a0f8a585e2c5480b5cf0e1ce",
+                "operationId": "c078c3fdf9abeb1fc6e7fd5d0bd544a4",
                 "parameters": [
                     {
                         "name": "X-Hub-Signature-256",

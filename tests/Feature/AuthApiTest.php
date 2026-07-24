@@ -9,24 +9,20 @@ use Tests\TestCase;
 
 class AuthApiTest extends TestCase
 {
-    // RefreshDatabase sorgt dafür, dass die Test-Datenbank nach jedem Test sauber geleert wird
     use RefreshDatabase;
 
     public function test_user_can_login_with_correct_credentials()
     {
-        // 1. Arrange: Einen Test-User anlegen
         $user = User::factory()->create([
             'email' => 'test@prepyourmeal.local',
             'password' => Hash::make('secret123'),
         ]);
 
-        // 2. Act: Den Login-Endpunkt aufrufen
-        $response = $this->postJson('/api/auth/login', [
+        $response = $this->postJson('/auth/login', [
             'email' => 'test@prepyourmeal.local',
             'password' => 'secret123',
         ]);
 
-        // 3. Assert: Prüfen, ob die Antwort erfolgreich ist und ein Token enthält
         $response->assertStatus(200)
             ->assertJsonStructure([
                 'status',
@@ -45,7 +41,7 @@ class AuthApiTest extends TestCase
             'password' => Hash::make('secret123'),
         ]);
 
-        $response = $this->postJson('/api/auth/login', [
+        $response = $this->postJson('/auth/login', [
             'email' => 'test@prepyourmeal.local',
             'password' => 'wrongpassword',
         ]);

@@ -14,7 +14,7 @@ use ZipArchive;
 class WebhookController extends Controller
 {
     #[OA\Post(
-        path: '/api/webhooks/github',
+        path: '/webhooks/github',
         summary: 'Synchronize recipes from GitHub',
         tags: ['System']
     )]

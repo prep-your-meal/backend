@@ -12,7 +12,7 @@ use OpenApi\Attributes as OA;
 class ShoppingListController extends Controller
 {
     #[OA\Get(
-        path: '/api/shopping-list',
+        path: '/shopping-list',
         summary: 'Get the smart shopping list',
         security: [['bearerAuth' => []]],
         tags: ['Shopping']
