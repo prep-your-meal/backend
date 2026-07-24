@@ -4,8 +4,13 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return response()->json([
-        'name' => 'PrepYourMeal API',
-        'status' => 'running',
-        'documentation' => url('/documentation'),
+        'status' => 'success',
+        'data' => [
+            'name' => config('app.name'),
+            'environment' => config('app.env'),
+            'status' => 'running',
+            'documentation' => url('/documentation'),
+            'version' => '1.0.0',
+        ],
     ]);
 });

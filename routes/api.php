@@ -3,12 +3,8 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\PlanController;
 use App\Http\Controllers\Api\ShoppingListController;
-use App\Http\Controllers\Api\SystemController;
 use App\Http\Controllers\Api\WebhookController;
 use Illuminate\Support\Facades\Route;
-
-// --- Public routes ---
-Route::get('/version', [SystemController::class, 'version']);
 
 // Auth & Socialite
 Route::post('/auth/login', [AuthController::class, 'login']);
