@@ -2,6 +2,10 @@
 
 use Illuminate\Support\Facades\Route;
 
+$version = file_exists(base_path('version.txt'))
+        ? trim(file_get_contents(base_path('version.txt')))
+        : 'latest';
+
 Route::get('/', function () {
     return response()->json([
         'status' => 'success',
@@ -10,7 +14,7 @@ Route::get('/', function () {
             'environment' => config('app.env'),
             'status' => 'running',
             'documentation' => url('/documentation'),
-            'version' => '1.0.0',
+            'version' => $version,
         ],
     ]);
 });

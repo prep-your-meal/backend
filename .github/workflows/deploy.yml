@@ -1,25 +1,56 @@
-name: Deploy to Webspace
+name: CI/CD Pipeline (Release & Deploy)
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
-  deploy:
+  release-and-deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # IMPORTANT: Allows the bot to push the CHANGELOG and tag back to the repository
 
     steps:
-      - name: Checkout Repository
+      # === PART 1: RELEASE & CHANGELOG GENERATION ON GITHUB ===
+      - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetches the entire history so conventional commits can be analyzed
 
-      - name: Deploy via SSH & Configure Environment
+      - name: Setup Node.js (Only ephemerally on GitHub Server)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Set Git Identity for Release Bot
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Generate SemVer, version.txt and CHANGELOG.md
+        # The --yes flag forces npx to execute the tool without prompting
+        run: npx --yes commit-and-tag-version
+
+      - name: Push new Release Commit and Tag back to GitHub
+        run: git push --follow-tags origin main
+
+      - name: Extract generated Tag Name
+        id: extract_tag
+        # Extracts the newly created tag (e.g., v1.1.0) and saves it to GitHub environment variables
+        run: echo "TAG_NAME=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
+
+      # === PART 2: DEPLOYMENT OF THE NEW TAG TO STRATO ===
+      - name: Deploy via SSH to Webspace
         uses: appleboy/ssh-action@v1.0.3
         env:
+          TAG_NAME: ${{ env.TAG_NAME }} # Uses the dynamically created tag!
           DB_HOST: ${{ secrets.DB_HOST }}
           DB_DATABASE: ${{ secrets.DB_DATABASE }}
           DB_USERNAME: ${{ secrets.DB_USERNAME }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           APP_URL: ${{ secrets.APP_URL }}
+          APP_KEY: ${{ secrets.APP_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WEBSPACE_TARGET_DIR: ${{ secrets.WEBSPACE_TARGET_DIR }}
           MAIL_HOST: ${{ secrets.MAIL_HOST }}
@@ -32,45 +63,46 @@ jobs:
           username: ${{ secrets.WEBSPACE_USER }}
           password: ${{ secrets.WEBSPACE_PASSWORD }}
           port: ${{ secrets.WEBSPACE_PORT || 22 }}
-          envs: DB_HOST,DB_DATABASE,DB_USERNAME,DB_PASSWORD,APP_URL,GITHUB_TOKEN,WEBSPACE_TARGET_DIR,MAIL_HOST,MAIL_PORT,MAIL_USERNAME,MAIL_PASSWORD,MAIL_FROM_ADDRESS
+          envs: TAG_NAME,DB_HOST,DB_DATABASE,DB_USERNAME,DB_PASSWORD,APP_URL,APP_KEY,GITHUB_TOKEN,WEBSPACE_TARGET_DIR,MAIL_HOST,MAIL_PORT,MAIL_USERNAME,MAIL_PASSWORD,MAIL_FROM_ADDRESS
           script: |
             TARGET_DIR="$WEBSPACE_TARGET_DIR"
-
-            # Define correct PHP CLI binary for Strato based on your logs
             PHP_BIN="/opt/RZphp83/bin/php-cli"
-            if [ ! -f "$PHP_BIN" ]; then
-                # Fallback just in case the path changes
+
+            # Fallback if specific Strato PHP version is not found
+            if [ ! -f "$PHP_BIN" ]; then 
                 PHP_BIN="php"
             fi
 
-            # Check if the repository already exists
+            # 1. Prepare Directory & Git Repository
             if [ ! -d "$TARGET_DIR/.git" ]; then
-                echo "Repository not found on server. Initializing clone..."
+                echo "Repository not found. Initializing clone..."
                 mkdir -p "$TARGET_DIR"
                 cd "$TARGET_DIR"
                 git clone https://x-access-token:$GITHUB_TOKEN@github.com/${{ github.repository }}.git .
             else
-                echo "Repository exists. Enforcing strict sync with main branch..."
+                echo "Fetching latest tags from origin..."
                 cd "$TARGET_DIR"
-                git fetch origin main
+                git fetch origin --tags --force
                 git clean -fd
-                git reset --hard origin/main
             fi
 
-            # Download local Composer if it does not exist
-            if [ ! -f "composer.phar" ]; then
-                echo "Composer not found. Downloading composer.phar..."
+            # 2. Checkout exactly the tagged release
+            echo "Deploying release: $TAG_NAME"
+            git checkout -f tags/$TAG_NAME
+
+            # 3. Install Composer Dependencies
+            echo "Installing Composer dependencies..."
+            if [ ! -f "composer.phar" ]; then 
                 curl -sS https://getcomposer.org/installer | $PHP_BIN
             fi
-
-            # Install production Composer dependencies using the local phar file
             $PHP_BIN composer.phar install --no-dev --optimize-autoloader --no-interaction
 
-            # Build the .env file dynamically from secrets
+            # 4. Generate .env File dynamically from secrets
+            echo "Building environment configuration..."
             cat << EOF > .env
             APP_NAME="PrepYourMeal API"
             APP_ENV=production
-            APP_KEY=
+            APP_KEY=$APP_KEY
             APP_DEBUG=false
             APP_URL=$APP_URL
 
@@ -115,26 +147,34 @@ jobs:
             MAIL_FROM_NAME="\${APP_NAME}"
             EOF
 
-            # Generate app key if not already set
+            # Generate App Key if missing or invalid
             if ! grep -q "APP_KEY=base64" .env || grep -q "APP_KEY=$" .env; then
+                echo "Generating application key..."
                 $PHP_BIN artisan key:generate --force
             fi
 
-            # Run Laravel optimizations and database migrations using proper PHP CLI
+            # 5. Laravel Optimizations
+            echo "Caching configurations and routing..."
             $PHP_BIN artisan config:cache
             $PHP_BIN artisan route:cache
             $PHP_BIN artisan view:cache
+
+            echo "Running database migrations..."
             $PHP_BIN artisan migrate --force
 
-            # Generate api docs
+            # 6. Swagger Docs Generation & Strato Subfolder Fixes
+            echo "Generating Swagger documentation..."
             $PHP_BIN artisan l5-swagger:generate
+
+            echo "Physically publishing Swagger assets to bypass Strato open_basedir restrictions..."
             mkdir -p public/docs/asset
-            if [ -d "vendor/swagger-api/swagger-ui/dist" ]; then
+            if [ -d "vendor/swagger-api/swagger-ui/dist" ]; then 
                 cp -R vendor/swagger-api/swagger-ui/dist/* public/docs/asset/
             fi
-            if [ -d "storage/api-docs" ]; then
+            if [ -d "storage/api-docs" ]; then 
                 cp -R storage/api-docs/* public/docs/
             fi
 
-            # Secure file permissions for shared hosting
-            chmod -R 775 storage bootstrap/cache
+            # 7. Secure File Permissions
+            echo "Setting appropriate file permissions..."
+            chmod -R 775 storage bootstrap/cache public/docs
