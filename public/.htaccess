@@ -3,6 +3,12 @@
         Options -MultiViews -Indexes
     </IfModule>
 
+    Header always unset X-Powered-By
+    Header unset X-Powered-By
+
+    Header always unset Server
+    Header unset Server
+
     RewriteEngine On
 
     # Handle Authorization Header
