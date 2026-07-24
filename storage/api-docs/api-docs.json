@@ -1,0 +1,247 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "PrepYourMeal API",
+        "description": "API documentation and testing interface for PrepYourMeal.",
+        "version": "1.0.0"
+    },
+    "paths": {
+        "/api/auth/login": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Local password login (for testing)",
+                "operationId": "dd51a484b7fa0f97c7680fdbde14cf5f",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "email",
+                                    "password"
+                                ],
+                                "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email"
+                                    },
+                                    "password": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Login successful, returns Sanctum token"
+                    },
+                    "401": {
+                        "description": "Invalid credentials"
+                    }
+                }
+            }
+        },
+        "/api/auth/{provider}/redirect": {
+            "get": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Get the OAuth redirect URL for the frontend",
+                "operationId": "a056a975024516894ed584b37735aaae",
+                "parameters": [
+                    {
+                        "name": "provider",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "github",
+                                "google"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Returns the URL to redirect the user to"
+                    }
+                }
+            }
+        },
+        "/api/auth/{provider}/callback": {
+            "get": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Handle OAuth callback from provider",
+                "operationId": "cddf551d3b6e72e7b88f1e884cb3c79a",
+                "parameters": [
+                    {
+                        "name": "provider",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "github",
+                                "google"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "302": {
+                        "description": "Redirects back to PWA with token"
+                    }
+                }
+            }
+        },
+        "/api/plan": {
+            "get": {
+                "tags": [
+                    "Meal Plan"
+                ],
+                "summary": "Get the currently active meal plan",
+                "operationId": "dcf73944bf9abf932a6dd42818b453e3",
+                "responses": {
+                    "200": {
+                        "description": "Current meal plan data"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/plan/generate": {
+            "post": {
+                "tags": [
+                    "Meal Plan"
+                ],
+                "summary": "Generate a new 7-day meal plan",
+                "operationId": "442369302e2dfea4c889ae1f7b932a99",
+                "responses": {
+                    "200": {
+                        "description": "Generated meal plan"
+                    },
+                    "400": {
+                        "description": "Not enough unused recipes available"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/shopping-list": {
+            "get": {
+                "tags": [
+                    "Shopping"
+                ],
+                "summary": "Get the smart shopping list",
+                "operationId": "f82fe9f8304abad859645dd9d4737f1f",
+                "parameters": [
+                    {
+                        "name": "portions",
+                        "in": "query",
+                        "description": "Number of portions to calculate (default: 1)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Categorized shopping list"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/version": {
+            "get": {
+                "tags": [
+                    "System"
+                ],
+                "summary": "Get the current API version",
+                "description": "Reads the version hash directly from the version.txt file.",
+                "operationId": "8bffb6bef481d404c3fd62b5b9a3e895",
+                "responses": {
+                    "200": {
+                        "description": "Returns the current version string"
+                    }
+                }
+            }
+        },
+        "/api/webhooks/github": {
+            "post": {
+                "tags": [
+                    "System"
+                ],
+                "summary": "Synchronize recipes from GitHub",
+                "operationId": "9adb8617a0f8a585e2c5480b5cf0e1ce",
+                "parameters": [
+                    {
+                        "name": "X-Hub-Signature-256",
+                        "in": "header",
+                        "description": "HMAC hex digest of the payload",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful synchronization"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "securitySchemes": {
+            "bearerAuth": {
+                "type": "http",
+                "scheme": "bearer"
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Auth",
+            "description": "Auth"
+        },
+        {
+            "name": "Meal Plan",
+            "description": "Meal Plan"
+        },
+        {
+            "name": "Shopping",
+            "description": "Shopping"
+        },
+        {
+            "name": "System",
+            "description": "System"
+        }
+    ]
+}

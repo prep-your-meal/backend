@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+
+echo -e "🚀 \033[36mStarting Pre-Commit Checks...\033[0m\n"
+
+# ----------------------------------------------------------------------
+# 1. LINTER (Laravel Pint via Laravel Sail)
+# ----------------------------------------------------------------------
+echo -e "🎨 \033[33mChecking code style with Laravel Pint...\033[0m"
+
+# Check if Sail is running. If not, we cannot execute Pint or Composer.
+if ! ./vendor/bin/sail ps | grep -q "Up"; then
+    echo -e "⚠️  \033[31mSail is not running! Please start the containers using './vendor/bin/sail up -d' to run the linter and security checks.\033[0m"
+    exit 1
+fi
+
+# Run Pint in test mode (does not modify files, only throws errors)
+if ! ./vendor/bin/sail pint --test; then
+    echo -e "\n🛑 \033[31mERROR: Code style does not match Laravel standards.\033[0m"
+    echo -e "💡 Run './vendor/bin/sail pint' to automatically fix the errors, and add the changes using 'git add'.\n"
+    exit 1
+fi
+echo -e "✅ \033[32mCode style is clean.\033[0m\n"
+
+
+# ----------------------------------------------------------------------
+# 2. VULNERABILITY SCANNING (Composer Audit via Laravel Sail)
+# ----------------------------------------------------------------------
+echo -e "🛡️  \033[33mScanning for vulnerable PHP dependencies...\033[0m"
+
+# Check the composer.lock against known CVEs
+if ! ./vendor/bin/sail composer audit; then
+    echo -e "\n🛑 \033[31mERROR: Vulnerable dependencies found in composer.lock!\033[0m"
+    echo -e "💡 Please run './vendor/bin/sail composer update' to patch the vulnerabilities, or check the output above for details.\n"
+    exit 1
+fi
+echo -e "✅ \033[32mNo known vulnerabilities in dependencies.\033[0m\n"
+
+
+# ----------------------------------------------------------------------
+# 3. SECRET SCANNING (Gitleaks via temporary Docker container)
+# ----------------------------------------------------------------------
+echo -e "🕵️‍♂️ \033[33mScanning for leaked passwords, tokens, and API keys...\033[0m"
+
+# We use the official Gitleaks Docker image. 
+# It downloads the image automatically if it doesn't exist yet.
+if ! docker run --rm -v "$(pwd):/pwd" -w /pwd zricethezav/gitleaks:latest detect --source . -v --no-git; then
+    echo -e "\n🛑 \033[31mERROR: Potential secret found in the code!\033[0m"
+    echo -e "💡 Please remove passwords, API keys, or tokens from the code (use the .env file for that).\n"
+    exit 1
+fi
+echo -e "✅ \033[32mNo secrets found.\033[0m\n"
+
+
+# ----------------------------------------------------------------------
+# SUCCESS
+# ----------------------------------------------------------------------
+echo -e "🎉 \033[32mAll checks passed! Commit is being created.\033[0m\n"
+exit 0

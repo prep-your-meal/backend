@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+MSG_FILE=$1
+COMMIT_MSG=$(head -n 1 "$MSG_FILE")
+
+# Regex for: type(scope): message OR type: message (incl. ! for breaking changes)
+PATTERN="^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-zA-Z0-9_-]+\))?!?: .+"
+
+if [[ ! $COMMIT_MSG =~ $PATTERN ]]; then
+    echo -e "\n🛑 \033[31mERROR: Commit message does not comply with Conventional Commits!\033[0m"
+    echo -e "Expected: <type>[optional scope]: <description>"
+    echo -e "Example: feat(auth): add google oauth login"
+    echo -e "Valid types: build, chore, ci, docs, feat, fix, perf, refactor, revert, style, test\n"
+    exit 1
+fi

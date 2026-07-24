@@ -1,0 +1,12 @@
+title = "Gitleaks configuration"
+
+[allowlist]
+description = "Global allowlist to ignore vendor packages and build artifacts"
+paths = [
+    '''vendor/''',
+    '''node_modules/''',
+    '''storage/''',
+    '''public/storage''',
+    '''composer.lock''',
+    '''package-lock.json'''
+]

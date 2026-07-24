@@ -1,0 +1,11 @@
+{
+    "[php]": {
+        "editor.defaultFormatter": "laravel.vscode-laravel",
+        "editor.formatOnSave": true
+    },
+    "[blade]": {
+        "editor.defaultFormatter": "laravel.vscode-laravel",
+        "editor.formatOnSave": true
+    },
+    "laravel.pint.enable": true
+}

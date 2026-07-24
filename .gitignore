@@ -1,0 +1,43 @@
+# Dependencies
+/node_modules
+/vendor
+
+# Compiled Assets
+/public/build
+/public/hot
+/public/storage
+
+# Local Environment & Keys (NEVER COMMIT!)
+.env
+.env.backup
+.env.testing
+/storage/*.key
+
+# Cache & Logs
+/storage/framework/cache/data/*
+!/storage/framework/cache/data/.gitignore
+/storage/framework/sessions/*
+!/storage/framework/sessions/.gitignore
+/storage/framework/testing/*
+!/storage/framework/testing/.gitignore
+/storage/framework/views/*
+!/storage/framework/views/.gitignore
+/storage/logs/*
+!/storage/logs/.gitignore
+.phpunit.result.cache
+
+# Docker / Sail
+docker-compose.override.yml
+
+# OS-generated Files (macOS / Windows)
+.DS_Store
+Thumbs.db
+
+# IDEs
+/.idea
+/.fleet
+
+# VS Code (Ignore everything, BUT allow our settings)
+/.vscode/*
+!/.vscode/settings.json
+!/.vscode/extensions.json
