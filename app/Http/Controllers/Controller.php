@@ -15,7 +15,7 @@ use OpenApi\Attributes as OA;
     scheme: 'bearer'
 )]
 #[OA\Server(
-    url: L5_SWAGGER_CONST_HOST,
+    url: '/api',
     description: 'API Server'
 )]
 abstract class Controller

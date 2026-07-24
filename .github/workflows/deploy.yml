@@ -71,7 +71,6 @@ jobs:
             APP_KEY=
             APP_DEBUG=false
             APP_URL=$APP_URL
-            L5_SWAGGER_CONST_HOST=$APP_URL
 
             APP_LOCALE=en
             APP_FALLBACK_LOCALE=en
