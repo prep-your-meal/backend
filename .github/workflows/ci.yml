@@ -26,13 +26,13 @@ jobs:
           tools: composer:v2
           coverage: none
 
+      - name: Install Composer Dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
       - name: Prepare Environment
         run: |
           cp .env.example .env
           php artisan key:generate
-
-      - name: Install Composer Dependencies
-        run: composer install --prefer-dist --no-interaction --no-progress
 
       - name: Check Code Formatting (Pint)
         run: ./vendor/bin/pint --test
