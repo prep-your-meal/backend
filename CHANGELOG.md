@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.2.4](https://github.com/prep-your-meal/backend/compare/v1.2.3...v1.2.4) (2026-07-25)
+
+
+### Bug Fixes
+
+* **core:** resolve static analysis errors and missing type hints ([bedaea9](https://github.com/prep-your-meal/backend/commit/bedaea965cd030f1015e2bde82b551802ae1a618))
+
 ## [1.2.3](https://github.com/prep-your-meal/backend/compare/v1.2.2...v1.2.3) (2026-07-24)
 
 
