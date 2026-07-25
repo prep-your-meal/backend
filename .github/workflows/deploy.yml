@@ -14,7 +14,7 @@ jobs:
     steps:
       # === PART 1: RELEASE & CHANGELOG GENERATION ON GITHUB ===
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0 # Fetches the entire history so conventional commits can be analyzed
 
