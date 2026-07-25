@@ -42,7 +42,7 @@ jobs:
 
       # === PART 2: DEPLOYMENT OF THE NEW TAG TO STRATO ===
       - name: Deploy via SSH to Webspace
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@v1.2.5
         env:
           TAG_NAME: ${{ env.TAG_NAME }} # Uses the dynamically created tag!
           DB_HOST: ${{ secrets.DB_HOST }}
