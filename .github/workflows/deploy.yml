@@ -19,7 +19,7 @@ jobs:
           fetch-depth: 0 # Fetches the entire history so conventional commits can be analyzed
 
       - name: Setup Node.js (Only ephemerally on GitHub Server)
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "20"
 
