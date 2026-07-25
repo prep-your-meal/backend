@@ -12,11 +12,11 @@ A headless backend providing the core business logic for PrepYourMeal. It handle
 
 ## 🛠 Tech Stack
 
-- **Framework:** Laravel (PHP 8.2+)
+- **Framework:** Laravel [PHP 8.2+]
 - **Database:** MariaDB / MySQL
 - **Environment:** Docker & Laravel Sail
 - **Authentication:** Laravel Sanctum & Laravel Socialite
-- **API Docs:** L5-Swagger (PHP 8 Attributes)
+- **API Docs:** L5-Swagger
 
 ---
 
@@ -25,18 +25,24 @@ A headless backend providing the core business logic for PrepYourMeal. It handle
 This project uses Laravel Sail and is optimized for **Docker**.
 
 ### 1. Prerequisites
+
 Ensure you have the following installed on your machine:
-- [Docker](https://www.docker.com/) (and Docker Compose)
+
+- [Docker](https://www.docker.com/) [and Docker Compose]
 - Git
 
 ### 2. Clone the Repository
+
 ```bash
 git clone [https://github.com/YOUR-GITHUB-NAME/prep-your-meal-api.git](https://github.com/YOUR-GITHUB-NAME/prep-your-meal-api.git)
 cd prep-your-meal-api
+
 ```
 
 ### 3. Install Composer Dependencies
+
 Since you might not have PHP installed locally, use a small temporary container to install the vendor dependencies:
+
 ```bash
 docker run --rm \
   -u "$(id -u):$(id -g)" \
@@ -44,37 +50,51 @@ docker run --rm \
   -w /var/www/html \
   laravelsail/php83-composer:latest \
   composer install --ignore-platform-reqs
+
 ```
-*Note: Running `composer install` will automatically configure the local Git hooks for this project.*
+
+Note: Running `composer install` will automatically configure the local Git hooks for this project.
 
 ### 4. Environment Configuration
+
 Copy the environment template and adjust the necessary variables:
+
 ```bash
 cp .env.example .env
+
 ```
+
 Make sure to configure the OAuth and Webhook variables in your `.env` file (see the Configuration section below).
 
 ### 5. Start the Sail Containers
+
 ```bash
 ./vendor/bin/sail up -d
 ```
 
 ### 6. Initialize Application Setup
+
 Generate the application key and run all database migrations:
+
 ```bash
 ./vendor/bin/sail artisan key:generate
 ./vendor/bin/sail artisan migrate
 ```
 
 ### 7. Create a Local Test Admin
+
 To test the API locally, create a default user via Laravel Tinker:
+
 ```bash
 ./vendor/bin/sail artisan tinker
 ```
+
 Inside the Tinker console, run:
+
 ```php
 User::create(['name' => 'Admin', 'email' => 'admin@test.de', 'password' => Hash::make('password123')]);
 ```
+
 Type `exit` to leave Tinker.
 
 ---
@@ -88,6 +108,7 @@ The API is fully documented using Swagger. To generate or update the documentati
 ```
 
 - **Access the UI:** `http://localhost/api/documentation`
+
 - **Authentication:** Use the `/api/auth/login` endpoint to get a Sanctum token. Copy the token and paste it into the "Authorize" modal at the top of the Swagger UI to access protected routes.
 
 ---
@@ -120,21 +141,35 @@ GITHUB_TOKEN=your_personal_access_token_for_reading_the_repo
 
 ## 🪝 Code Quality & Git Hooks
 
-This project enforces strict code quality and commit standards using native Git hooks. The hooks are automatically configured when you run `composer install`.
+This project enforces strict code quality and commit standards using native Git hooks and Continuous Integration. The hooks are automatically configured when you run `composer install`.
 
 ### Pre-Commit Checks
-Before a commit is created, the following automated checks run:
+
+Before a commit is created, the following automated checks run locally:
+
 1. **Laravel Pint (Linter):** Checks the code style against Laravel standards. If this fails, run `./vendor/bin/sail pint` to automatically fix formatting issues, stage the changed files, and try committing again. (Requires Sail containers to be running).
-2. **Composer Audit (Vulnerability Scanner):** Scans the `composer.lock` file for known security vulnerabilities (CVEs) in installed packages. If this fails, run `./vendor/bin/sail composer update` to patch the dependencies. (Requires Sail containers to be running).
-3. **Gitleaks (Secret Scanner):** Scans the codebase for accidentally committed secrets (API keys, passwords) via a temporary Docker container.
+
+2. **Larastan / PHPStan (Static Analysis):** Scans the code for logical errors and type inconsistencies (currently checking on Level 5). If this fails, review the reported errors and fix them. You can run it manually via `./vendor/bin/sail bin phpstan analyse`. (Requires Sail containers to be running).
+
+3. **Composer Audit (Vulnerability Scanner):** Scans the `composer.lock` file for known security vulnerabilities (CVEs) in installed packages. If this fails, run `./vendor/bin/sail composer update` to patch the dependencies. (Requires Sail containers to be running).
+
+4. **Gitleaks (Secret Scanner):** Scans the codebase for accidentally committed secrets (API keys, passwords) via a temporary Docker container.
+
+### Continuous Integration (CI)
+
+In addition to local hooks, our GitHub Action (`ci.yml`) acts as a gatekeeper. It automatically validates every Code-Push and Pull Request. If Pint flags unformatted code or Larastan detects an error, the pipeline will fail and highlight the exact issue directly in GitHub.
 
 ### Commit Message Standard (Conventional Commits)
+
 Commit messages must follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
 `<type>[optional scope]: <description>`
 
 **Examples:**
+
 - `feat(auth): implement google login`
+
 - `fix(shopping-list): correct amount aggregation logic`
+
 - `chore(git): update readme with hook documentation`
 
 ---
@@ -150,9 +185,10 @@ The application uses PHPUnit/Pest for automated feature and unit testing. To run
 ## 🔒 Security
 
 - All endpoints under `/api/plan` and `/api/shopping-list` are strictly protected by the `auth:sanctum` middleware.
+
 - OAuth callbacks handle user creation completely stateless to support modern headless PWA architectures.
 
 ## 📄 License
 
-This project is open-sourced software licensed under the [Apache License 2.0](LICENSE). 
+This project is open-sourced software licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
 You are free to use, modify, and distribute this software, provided that you state changes and retain the original copyright notice. For more details, see the `LICENSE` file in the repository.

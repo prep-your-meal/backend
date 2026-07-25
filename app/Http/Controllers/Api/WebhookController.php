@@ -53,9 +53,9 @@ class WebhookController extends Controller
 
     private function downloadAndExtractRepo(string $destinationPath): void
     {
-        $repo = env('GITHUB_REPO');
-        $branch = env('GITHUB_BRANCH', 'main');
-        $token = env('GITHUB_TOKEN');
+        $repo = config('GITHUB_REPO');
+        $branch = config('GITHUB_BRANCH', 'main');
+        $token = config('GITHUB_TOKEN');
 
         $url = "https://api.github.com/repos/{$repo}/zipball/{$branch}";
         $zipPath = storage_path('app/temp_repo.zip');

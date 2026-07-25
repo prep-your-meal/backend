@@ -23,7 +23,20 @@ echo -e "✅ \033[32mCode style is clean.\033[0m\n"
 
 
 # ----------------------------------------------------------------------
-# 2. VULNERABILITY SCANNING (Composer Audit via Laravel Sail)
+# 2. STATIC ANALYSIS (Larastan / PHPStan via Laravel Sail)
+# ----------------------------------------------------------------------
+echo -e "🔎 \033[33mRunning static analysis with Larastan...\033[0m"
+
+if ! ./vendor/bin/sail bin phpstan analyse; then
+    echo -e "\n🛑 \033[31mERROR: Static analysis found logical errors or type inconsistencies.\033[0m"
+    echo -e "💡 Please fix the errors listed above and add the changes using 'git add'.\n"
+    exit 1
+fi
+echo -e "✅ \033[32mStatic analysis passed.\033[0m\n"
+
+
+# ----------------------------------------------------------------------
+# 3. VULNERABILITY SCANNING (Composer Audit via Laravel Sail)
 # ----------------------------------------------------------------------
 echo -e "🛡️  \033[33mScanning for vulnerable PHP dependencies...\033[0m"
 
@@ -37,7 +50,7 @@ echo -e "✅ \033[32mNo known vulnerabilities in dependencies.\033[0m\n"
 
 
 # ----------------------------------------------------------------------
-# 3. SECRET SCANNING (Gitleaks via temporary Docker container)
+# 4. SECRET SCANNING (Gitleaks via temporary Docker container)
 # ----------------------------------------------------------------------
 echo -e "🕵️‍♂️ \033[33mScanning for leaked passwords, tokens, and API keys...\033[0m"
 

@@ -35,4 +35,14 @@ return [
         ],
     ],
 
+    'github_webhook' => [
+        'repo' => env('GITHUB_REPO'),
+        'branch' => env('GITHUB_BRANCH', 'main'),
+        'token' => env('GITHUB_TOKEN'),
+    ],
+
+    'frontend' => [
+        'url' => env('FRONTEND_URL', 'http://localhost:5173'),
+    ],
+
 ];

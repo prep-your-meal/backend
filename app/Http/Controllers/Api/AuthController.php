@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\AbstractProvider;
 use OpenApi\Attributes as OA;
 
 class AuthController extends Controller
@@ -68,8 +69,10 @@ class AuthController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Provider not supported'], 400);
         }
 
+        /** @var AbstractProvider $driver */
+        $driver = Socialite::driver($provider);
         // stateless() is crucial for API/PWA flows!
-        $url = Socialite::driver($provider)->stateless()->redirect()->getTargetUrl();
+        $url = $driver->stateless()->redirect()->getTargetUrl();
 
         return response()->json([
             'status' => 'success',
@@ -87,7 +90,9 @@ class AuthController extends Controller
     public function handleProviderCallback($provider)
     {
         try {
-            $socialUser = Socialite::driver($provider)->stateless()->user();
+            /** @var AbstractProvider $driver */
+            $driver = Socialite::driver($provider);
+            $socialUser = $driver->stateless()->user();
 
             // Find or create the user
             $user = User::firstOrCreate(
@@ -106,13 +111,13 @@ class AuthController extends Controller
 
             // Redirect back to your Vue.js PWA with the token in the URL
             // In production, define FRONTEND_URL in your .env (e.g. https://my-pwa.com)
-            $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
+            $frontendUrl = config('FRONTEND_URL', 'http://localhost:5173');
 
             return redirect()->to("{$frontendUrl}/auth/callback?token={$token}");
 
         } catch (\Exception $e) {
             Log::error("OAuth Callback Error ({$provider}): ".$e->getMessage());
-            $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
+            $frontendUrl = config('FRONTEND_URL', 'http://localhost:5173');
 
             return redirect()->to("{$frontendUrl}/auth/error");
         }
