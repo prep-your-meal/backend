@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <title>PrepYourMeal API Documentation</title>
     <link rel="stylesheet" type="text/css" href="{{ l5_swagger_asset($documentation, 'swagger-ui.css') }}">
-    <link rel="icon" type="image/png" href="{{ l5_swagger_asset($documentation, 'favicon-32x32.png') }}" sizes="32x32"/>
-    <link rel="icon" type="image/png" href="{{ l5_swagger_asset($documentation, 'favicon-16x16.png') }}" sizes="16x16"/>
+    <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico') }}?v={{ time() }}">
+    <link rel="icon" type="image/png" href="{{ asset('favicon-32x32.png') }}?v={{ time() }}" sizes="32x32"/>
+    <link rel="icon" type="image/png" href="{{ asset('favicon-16x16.png') }}?v={{ time() }}" sizes="16x16"/>
     <style>
     html
     {
@@ -26,6 +27,19 @@
     }
     .swagger-ui .topbar {
         display: none !important;
+    }
+    .swagger-ui .info h1::before {
+        content: "";
+        display: inline-block;
+        background-image: url('/images/prepyourmeal_logo.png');
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
+        width: 128px;  
+        height: 128px; 
+        margin-right: -15px; 
+        vertical-align: middle;
+        background-color: transparent;
     }
     </style>
     @if(config('l5-swagger.defaults.ui.display.dark_mode'))
