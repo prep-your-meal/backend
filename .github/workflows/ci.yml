@@ -39,3 +39,60 @@ jobs:
 
       - name: Run Static Analysis (Larastan)
         run: ./vendor/bin/phpstan analyse --error-format=github
+
+  coverage:
+    name: Test Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          tools: composer:v2
+          coverage: xdebug
+
+      - name: Install Composer Dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Prepare Environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Create SQLite Database
+        run: touch database/database.sqlite
+
+      - name: Run Migrations
+        run: php artisan migrate --force
+
+      - name: Run Tests with Coverage
+        run: php artisan test --coverage
+
+      - name: Upload coverage artifact
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report-php
+          path: coverage/cobertura.xml
+
+  upload-coverage-php:
+    needs: coverage
+    if: ${{ !cancelled() && needs.coverage.result == 'success' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      code-quality: write
+    steps:
+      - name: Download coverage artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: coverage-report-php
+      - uses: actions/upload-code-coverage@v1
+        with:
+          file: cobertura.xml
+          language: PHP
+          label: code-coverage-agent
