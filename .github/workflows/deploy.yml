@@ -178,4 +178,4 @@ jobs:
 
             # 7. Secure File Permissions
             echo "Setting appropriate file permissions..."
-            chmod -R 775 storage bootstrap/cache public/docs public/api
+            chmod -R 775 storage bootstrap/cache public/docs public/images
