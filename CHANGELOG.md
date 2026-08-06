@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.2.10](https://github.com/prep-your-meal/backend/compare/v1.2.9...v1.2.10) (2026-08-06)
+
+
+### Bug Fixes
+
+* **assets:** align static file paths with api routing for swagger ui ([8e320a7](https://github.com/prep-your-meal/backend/commit/8e320a7654a72469ef38bad2ee4c17c07cd917aa))
+* **ci:** remove permissions for missing directory ([300cdcb](https://github.com/prep-your-meal/backend/commit/300cdcb19fc0ebcdadcc8a8a7612d7c28730e4a1))
+* **README:** broken description for git clone command ([59fae56](https://github.com/prep-your-meal/backend/commit/59fae56e1156c638ac30c50e5992d2d2be01cd97))
+
 ## [1.2.11](https://github.com/prep-your-meal/backend/compare/v1.2.10...v1.2.11) (2026-08-06)
 
 ## [1.2.10](https://github.com/prep-your-meal/backend/compare/v1.2.9...v1.2.10) (2026-08-06)
