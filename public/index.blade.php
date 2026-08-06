@@ -31,7 +31,7 @@
     .swagger-ui .info h1::before {
         content: "";
         display: inline-block;
-        background-image: url('{{ asset("images/prepyourmeal_logo.png") }}');
+        background-image: url('{{ asset("api/images/prepyourmeal_logo.png") }}');
         background-size: contain;
         background-repeat: no-repeat;
         background-position: center;
