@@ -34,7 +34,7 @@ Ensure you have the following installed on your machine:
 ### 2. Clone the Repository
 
 ```bash
-git clone [https://github.com/YOUR-GITHUB-NAME/prep-your-meal-api.git](https://github.com/YOUR-GITHUB-NAME/prep-your-meal-api.git)
+git clone https://github.com/prep-your-meal/backend.git
 cd prep-your-meal-api
 
 ```
