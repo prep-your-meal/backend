@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <title>PrepYourMeal API Documentation</title>
     <link rel="stylesheet" type="text/css" href="{{ l5_swagger_asset($documentation, 'swagger-ui.css') }}">
-    <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico') }}?v={{ time() }}">
-    <link rel="icon" type="image/png" href="{{ asset('favicon-32x32.png') }}?v={{ time() }}" sizes="32x32"/>
-    <link rel="icon" type="image/png" href="{{ asset('favicon-16x16.png') }}?v={{ time() }}" sizes="16x16"/>
+    <link rel="icon" type="image/x-icon" href="{{ asset('api/favicon.ico') }}?v={{ time() }}">
+    <link rel="icon" type="image/png" href="{{ asset('api/favicon-32x32.png') }}?v={{ time() }}" sizes="32x32"/>
+    <link rel="icon" type="image/png" href="{{ asset('api/favicon-16x16.png') }}?v={{ time() }}" sizes="16x16"/>
     <style>
     html
     {
@@ -31,7 +31,7 @@
     .swagger-ui .info h1::before {
         content: "";
         display: inline-block;
-        background-image: url('/images/prepyourmeal_logo.png');
+        background-image: url('{{ asset("api/images/prepyourmeal_logo.png") }}');
         background-size: contain;
         background-repeat: no-repeat;
         background-position: center;
