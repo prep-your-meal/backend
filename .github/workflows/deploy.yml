@@ -54,7 +54,7 @@ jobs:
           APP_URL: ${{ secrets.APP_URL }}
           APP_KEY: ${{ secrets.APP_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DOWNLOAD_TOKEN: ${{ secrets.GITHUB_DOWNLOAD_TOKEN }}
+          DOWNLOAD_TOKEN: ${{ secrets.DOWNLOAD_TOKEN }}
           WEBSPACE_TARGET_DIR: ${{ secrets.WEBSPACE_TARGET_DIR }}
           MAIL_HOST: ${{ secrets.MAIL_HOST }}
           MAIL_PORT: ${{ secrets.MAIL_PORT }}
