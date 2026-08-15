@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.3.0](https://github.com/prep-your-meal/backend/compare/v1.2.10...v1.3.0) (2026-08-15)
+
+
+### Features
+
+* **webhook:** add GitHub webhook for recipe synchronization and tests ([ff23bf1](https://github.com/prep-your-meal/backend/commit/ff23bf1c26e9b29b383de123a5f2244f9219a2e9))
+
 ## [1.2.10](https://github.com/prep-your-meal/backend/compare/v1.2.9...v1.2.10) (2026-08-06)
 
 
