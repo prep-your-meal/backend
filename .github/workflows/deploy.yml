@@ -115,6 +115,8 @@ jobs:
             APP_MAINTENANCE_DRIVER=file
             BCRYPT_ROUNDS=12
 
+            RECIPE_SYNC_SECRET=$RECIPE_SYNC_SECRET
+
             LOG_CHANNEL=stack
             LOG_STACK=single
             LOG_DEPRECATIONS_CHANNEL=null
