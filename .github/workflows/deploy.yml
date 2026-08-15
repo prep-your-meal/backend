@@ -54,6 +54,7 @@ jobs:
           APP_URL: ${{ secrets.APP_URL }}
           APP_KEY: ${{ secrets.APP_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOWNLOAD_TOKEN: ${{ secrets.GITHUB_DOWNLOAD_TOKEN }}
           WEBSPACE_TARGET_DIR: ${{ secrets.WEBSPACE_TARGET_DIR }}
           MAIL_HOST: ${{ secrets.MAIL_HOST }}
           MAIL_PORT: ${{ secrets.MAIL_PORT }}
@@ -65,7 +66,7 @@ jobs:
           username: ${{ secrets.WEBSPACE_USER }}
           password: ${{ secrets.WEBSPACE_PASSWORD }}
           port: ${{ secrets.WEBSPACE_PORT || 22 }}
-          envs: TAG_NAME,DB_HOST,DB_DATABASE,DB_USERNAME,DB_PASSWORD,APP_URL,APP_KEY,GITHUB_TOKEN,WEBSPACE_TARGET_DIR,MAIL_HOST,MAIL_PORT,MAIL_USERNAME,MAIL_PASSWORD,MAIL_FROM_ADDRESS,RECIPE_SYNC_SECRET
+          envs: TAG_NAME,DB_HOST,DB_DATABASE,DB_USERNAME,DB_PASSWORD,APP_URL,APP_KEY,GITHUB_TOKEN,DOWNLOAD_TOKEN,WEBSPACE_TARGET_DIR,MAIL_HOST,MAIL_PORT,MAIL_USERNAME,MAIL_PASSWORD,MAIL_FROM_ADDRESS,RECIPE_SYNC_SECRET
           script: |
             TARGET_DIR="$WEBSPACE_TARGET_DIR"
             PHP_BIN="/opt/RZphp83/bin/php-cli"
@@ -116,6 +117,9 @@ jobs:
             BCRYPT_ROUNDS=12
 
             RECIPE_SYNC_SECRET=$RECIPE_SYNC_SECRET
+            GITHUB_REPO="prep-your-meal/recipes"
+            GITHUB_BRANCH="main"
+            GITHUB_TOKEN=$DOWNLOAD_TOKEN
 
             LOG_CHANNEL=stack
             LOG_STACK=single
