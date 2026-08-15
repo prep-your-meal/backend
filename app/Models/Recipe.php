@@ -17,10 +17,25 @@ class Recipe extends Model
 
     protected $keyType = 'string';
 
-    protected $fillable = ['slug', 'title', 'budget', 'calories'];
+    protected $fillable = [
+        'slug',
+        'title',
+        'image',
+        'prep_time',
+        'cook_time',
+        'default_portions',
+        'categories',
+        'calories',
+        'protein_g',
+        'carbs_g',
+        'fat_g',
+        'budget',
+    ];
 
     protected $casts = [
         'budget' => BudgetCategory::class,
+        'default_portions' => 'integer',
+        'categories' => 'array', // Automatically casts the JSON column to a PHP array
     ];
 
     public function ingredients(): BelongsToMany

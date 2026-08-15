@@ -13,13 +13,19 @@ return new class extends Migration
     {
         Schema::create('meal_plans', function (Blueprint $table) {
             $table->id();
-            // Falls später FA-01 (Personen/Accounts) hinzukommt, bereiten wir einen user_id vor
+
+            // Prepares a user_id for multi-account structures (e.g., FA-01)
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
 
             $table->string('recipe_slug');
             $table->foreign('recipe_slug')->references('slug')->on('recipes')->cascadeOnDelete();
 
-            $table->date('scheduled_for'); // Wann wird/wurde es gegessen?
+            // When is/was this meal scheduled to be eaten?
+            $table->date('scheduled_for');
+
+            // NEW: How many portions are planned for this specific meal on this day
+            $table->integer('portions')->default(1);
+
             $table->timestamps();
         });
     }

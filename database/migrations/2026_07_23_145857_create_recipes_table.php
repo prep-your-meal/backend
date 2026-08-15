@@ -15,8 +15,27 @@ return new class extends Migration
             $table->string('slug')->primary();
 
             $table->string('title');
-            $table->integer('budget');
-            $table->integer('calories');
+            $table->string('image')->nullable();
+
+            // Times in minutes
+            $table->integer('prep_time')->nullable();
+            $table->integer('cook_time')->nullable();
+
+            // The default number of portions from the Markdown file
+            $table->integer('default_portions')->default(1);
+
+            // Storing the categories array as JSON
+            $table->json('categories')->nullable();
+
+            // Macros (per portion)
+            $table->integer('calories')->nullable();
+            $table->integer('protein_g')->nullable();
+            $table->integer('carbs_g')->nullable();
+            $table->integer('fat_g')->nullable();
+
+            // Kept nullable in case you still want to use your Budget Enum later
+            $table->integer('budget')->nullable();
+
             $table->timestamps();
         });
     }

@@ -99,6 +99,8 @@ class PlanController extends Controller
                     'user_id' => $userId,
                     'recipe_slug' => $recipe->slug,
                     'scheduled_for' => $scheduledDate->format('Y-m-d'),
+                    // DEFAULT: Initially plan the meal with the recipe's base portion size
+                    'portions' => $recipe->default_portions,
                 ]);
 
                 $planResponse[] = [

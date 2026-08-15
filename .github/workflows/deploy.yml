@@ -50,6 +50,7 @@ jobs:
           DB_DATABASE: ${{ secrets.DB_DATABASE }}
           DB_USERNAME: ${{ secrets.DB_USERNAME }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          RECIPE_SYNC_SECRET: ${{ secrets.RECIPE_SYNC_SECRET }}
           APP_URL: ${{ secrets.APP_URL }}
           APP_KEY: ${{ secrets.APP_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

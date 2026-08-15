@@ -35,10 +35,11 @@ return [
         ],
     ],
 
-    'github_webhook' => [
+    'github' => [
         'repo' => env('GITHUB_REPO'),
         'branch' => env('GITHUB_BRANCH', 'main'),
         'token' => env('GITHUB_TOKEN'),
+        'sync_secret' => env('RECIPE_SYNC_SECRET'),
     ],
 
     'frontend' => [
