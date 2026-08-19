@@ -136,8 +136,11 @@ class PlanController extends Controller
             $seedRecipe = $availableRecipes->random();
             $selectedRecipes = collect([$seedRecipe]);
 
+            // Check user preference, default to true if null
+            $shouldMinimizeWaste = $user->minimize_food_waste ?? true;
+
             // 4. Find overlapping ingredients to minimize food waste
-            if ($targetMeals > 1) {
+            if ($shouldMinimizeWaste && $targetMeals > 1) {
                 $seedIngredientSlugs = DB::table('ingredient_recipe')
                     ->where('recipe_slug', $seedRecipe->slug)
                     ->pluck('ingredient_slug');

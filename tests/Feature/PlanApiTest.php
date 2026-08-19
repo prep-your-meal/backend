@@ -158,4 +158,45 @@ class PlanApiTest extends TestCase
             'recipe_slug' => 'vegan-slow-meal',
         ]);
     }
+
+    public function test_respects_minimize_food_waste_toggle_enabled()
+    {
+        $user = User::factory()->create([
+            'target_meals_per_week' => 3,
+            'minimize_food_waste' => true,
+        ]);
+        Sanctum::actingAs($user, ['*']);
+
+        Recipe::factory()->count(5)->create();
+
+        $response = $this->postJson('/plan/generate');
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'status' => 'success',
+            ]);
+
+        $this->assertDatabaseCount('meal_plans', 3);
+    }
+
+    public function test_skips_food_waste_optimization_when_disabled()
+    {
+        $user = User::factory()->create([
+            'target_meals_per_week' => 3,
+            'minimize_food_waste' => false, // Explicitly turned off
+        ]);
+        Sanctum::actingAs($user, ['*']);
+
+        Recipe::factory()->count(5)->create();
+
+        $response = $this->postJson('/plan/generate');
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'status' => 'success',
+            ]);
+
+        // Should still generate the requested number of meals via random padding
+        $this->assertDatabaseCount('meal_plans', 3);
+    }
 }

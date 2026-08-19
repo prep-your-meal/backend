@@ -52,6 +52,10 @@ class UserPreferenceController extends Controller
                             type: 'array',
                             items: new OA\Items(type: 'string', example: 'meal-prep-friendly')
                         ),
+                        new OA\Property(
+                            property: 'minimize_food_waste',
+                            type: 'boolean'
+                        ),
                     ]
                 ),
             ]
@@ -69,6 +73,7 @@ class UserPreferenceController extends Controller
                 'dietary_preferences' => $user->dietary_preferences ?? [],
                 'fitness_goals' => $user->fitness_goals ?? [],
                 'logistics_preferences' => $user->logistics_preferences ?? [],
+                'minimize_food_waste' => (bool) ($user->minimize_food_waste ?? true),
             ],
         ]);
     }
@@ -101,6 +106,10 @@ class UserPreferenceController extends Controller
                     type: 'array',
                     items: new OA\Items(type: 'string', example: 'meal-prep-friendly')
                 ),
+                new OA\Property(
+                    property: 'minimize_food_waste',
+                    type: 'boolean'
+                ),
             ]
         )
     )]
@@ -121,6 +130,7 @@ class UserPreferenceController extends Controller
 
             'logistics_preferences' => ['nullable', 'array'],
             'logistics_preferences.*' => ['string', Rule::in(self::ALLOWED_LOGISTICS)],
+            'minimize_food_waste' => ['nullable', 'boolean'],
         ]);
 
         $user = $request->user();
@@ -136,6 +146,7 @@ class UserPreferenceController extends Controller
                 'dietary_preferences' => $user->dietary_preferences,
                 'fitness_goals' => $user->fitness_goals,
                 'logistics_preferences' => $user->logistics_preferences,
+                'minimize_food_waste' => (bool) ($user->minimize_food_waste ?? true),
             ],
         ]);
     }

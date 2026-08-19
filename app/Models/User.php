@@ -21,6 +21,7 @@ class User extends Authenticatable
         'dietary_preferences',
         'fitness_goals',
         'logistics_preferences',
+        'minimize_food_waste',
     ];
 
     protected $hidden = [
@@ -37,6 +38,7 @@ class User extends Authenticatable
             'dietary_preferences' => 'array',
             'fitness_goals' => 'array',
             'logistics_preferences' => 'array',
+            'minimize_food_waste' => 'boolean',
         ];
     }
 }
