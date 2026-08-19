@@ -25,40 +25,71 @@ Route::post('/webhooks/github', [WebhookController::class, 'handle']);
 |
 */
 
-// Serve Swagger assets (CSS, JS, PNG)
+// / Serve Swagger assets (CSS, JS, PNG)
 Route::get('/docs/asset/{asset}', function ($asset) {
-    // Access the physically copied files inside the public directory
-    $path = public_path("docs/asset/{$asset}");
+    // List of all possible storage locations (Strato + local vendor directories)
+    $paths = [
+        public_path("docs/asset/{$asset}"),
+        base_path("vendor/swagger-api/swagger-ui/dist/{$asset}"), // Default path
+        base_path("vendor/darkaonline/l5-swagger/ui/dist/{$asset}"), // Alternative L5 version path
+    ];
 
-    if (file_exists($path)) {
-        // Determine the correct MIME type for the requested asset
-        $extension = pathinfo($path, PATHINFO_EXTENSION);
-        $mime = match ($extension) {
-            'css' => 'text/css',
-            'js' => 'application/javascript',
-            'png' => 'image/png',
-            default => 'text/plain'
-        };
+    foreach ($paths as $path) {
+        if (file_exists($path)) {
+            $extension = pathinfo($path, PATHINFO_EXTENSION);
+            $mime = match ($extension) {
+                'css' => 'text/css',
+                'js' => 'application/javascript',
+                'png' => 'image/png',
+                default => 'text/plain'
+            };
 
-        // Return the static file
-        return response()->file($path, ['Content-Type' => $mime]);
+            return response()->file($path, ['Content-Type' => $mime]);
+        }
     }
 
-    // Return a 404 JSend response if the asset is missing
-    abort(404);
-});
+    // Temporary debug output: Shows exactly where Laravel searched
+    return response()->json([
+        'status' => 'error',
+        'message' => 'Swagger asset locally missing.',
+        'asset_requested' => $asset,
+        'searched_paths' => $paths,
+    ], 404);
+})->name('l5-swagger.default.asset')->where('asset', '.*'); // <--- IMPORTANT: Allows file extensions in the route parameter
 
 // Serve the generated JSON documentation for Swagger (static file bypass)
 Route::get('/docs/{file?}', function ($file = 'api-docs.json') {
-    // Greift auf die kopierte JSON-Datei im public-Ordner zu
+    // 1. Check public path (Production / Strato workaround)
     $path = public_path("docs/{$file}");
+
+    // 2. Fallback to storage path (Local Development / Sail)
+    if (! file_exists($path)) {
+        $path = storage_path("api-docs/{$file}");
+    }
 
     if (file_exists($path)) {
         return response()->file($path, ['Content-Type' => 'application/json']);
     }
 
     abort(404, 'Swagger documentation JSON not found.');
-});
+})->name('l5-swagger.default.docs');
+
+// Serve the generated JSON documentation for Swagger (static file bypass)
+Route::get('/docs/{file?}', function ($file = 'api-docs.json') {
+    // 1. Check public path (Production / Strato Workaround)
+    $path = public_path("docs/{$file}");
+
+    // 2. Fallback to storage path (Local Development / Sail)
+    if (! file_exists($path)) {
+        $path = storage_path("api-docs/{$file}");
+    }
+
+    if (file_exists($path)) {
+        return response()->file($path, ['Content-Type' => 'application/json']);
+    }
+
+    abort(404, 'Swagger documentation JSON not found.');
+})->name('l5-swagger.default.asset');
 
 // Serve general information about the api
 Route::get('/', function () {
@@ -68,11 +99,11 @@ Route::get('/', function () {
             'name' => config('app.name'),
             'environment' => config('app.env'),
             'status' => 'running',
-            'documentation' => url('/documentation'),
+            'documentation' => route('l5-swagger.default.api'),
             'version' => API_VERSION,
         ],
     ]);
-});
+})->name('l5-swagger.default.docs');
 
 // --- Protected routes ---
 Route::middleware('auth:sanctum')->group(function () {
