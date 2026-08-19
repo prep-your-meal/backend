@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.3.7](https://github.com/prep-your-meal/backend/compare/v1.3.6...v1.3.7) (2026-08-19)
+
+
+### Bug Fixes
+
+* **swagger:** resolve local UI asset loading and route mapping ([076166c](https://github.com/prep-your-meal/backend/commit/076166c12708801fc19f368fde11f239df2c8310))
+
 ## [1.3.6](https://github.com/prep-your-meal/backend/compare/v1.3.5...v1.3.6) (2026-08-19)
 
 
