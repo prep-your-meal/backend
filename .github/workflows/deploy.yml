@@ -116,10 +116,10 @@ jobs:
             APP_MAINTENANCE_DRIVER=file
             BCRYPT_ROUNDS=12
 
-            RECIPE_SYNC_SECRET=$RECIPE_SYNC_SECRET
+            RECIPE_SYNC_SECRET="$RECIPE_SYNC_SECRET"
             GITHUB_REPO="prep-your-meal/recipes"
             GITHUB_BRANCH="main"
-            GITHUB_TOKEN=$DOWNLOAD_TOKEN
+            GITHUB_TOKEN="$DOWNLOAD_TOKEN"
 
             LOG_CHANNEL=stack
             LOG_STACK=single

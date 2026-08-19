@@ -93,9 +93,9 @@ class WebhookController extends Controller
      */
     private function downloadAndExtractRepo(string $destinationPath): void
     {
-        $repo = config('services.github.repo');
-        $branch = config('services.github.branch', 'main');
-        $token = config('services.github.token');
+        $repo = trim(config('services.github.repo'));
+        $branch = trim(config('services.github.branch', 'main'));
+        $token = trim(config('services.github.token'));
 
         $url = "https://api.github.com/repos/{$repo}/zipball/{$branch}";
         $zipPath = storage_path('app/temp_repo.zip');
