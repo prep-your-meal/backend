@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.4.1](https://github.com/prep-your-meal/backend/compare/v1.4.0...v1.4.1) (2026-08-19)
+
+
+### Bug Fixes
+
+* **swagger:** remove /api prefix from paths to prevent /api/api double prefix ([ca82181](https://github.com/prep-your-meal/backend/commit/ca8218166f6fadb25e8474be794ce18e0e6167c3))
+
 ## [1.4.0](https://github.com/prep-your-meal/backend/compare/v1.3.7...v1.4.0) (2026-08-19)
 
 
