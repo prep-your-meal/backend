@@ -15,7 +15,7 @@ use OpenApi\Attributes as OA;
 class PlanController extends Controller
 {
     #[OA\Get(
-        path: '/api/plan',
+        path: '/plan',
         summary: 'Get the currently active meal plan',
         security: [['bearerAuth' => []]],
         tags: ['Meal Plan']
@@ -57,7 +57,7 @@ class PlanController extends Controller
     }
 
     #[OA\Post(
-        path: '/api/plan/generate',
+        path: '/plan/generate',
         summary: 'Generate a smart meal plan based on preferences',
         description: 'Generates a meal plan minimizing food waste via overlapping ingredients, respects user preferences, and avoids repeating meals from the last 30 days.',
         security: [['bearerAuth' => []]],

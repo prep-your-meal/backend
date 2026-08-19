@@ -20,7 +20,7 @@ class UserPreferenceController extends Controller
     private const ALLOWED_LOGISTICS = ['meal-prep-friendly', 'quick', 'one-pot'];
 
     #[OA\Get(
-        path: '/api/user/preferences',
+        path: '/user/preferences',
         summary: 'Retrieve user preferences',
         description: "Returns the currently authenticated user's meal plan preferences.",
         security: [['bearerAuth' => []]],
@@ -74,7 +74,7 @@ class UserPreferenceController extends Controller
     }
 
     #[OA\Put(
-        path: '/api/user/preferences',
+        path: '/user/preferences',
         summary: 'Update user preferences',
         description: 'Update the meal plan preferences for the authenticated user via the frontend wizard.',
         security: [['bearerAuth' => []]],
