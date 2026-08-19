@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\MealPlan;
 use App\Models\Recipe;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -76,7 +77,7 @@ class PlanController extends Controller
             $targetMeals = $user->target_meals_per_week ?? 7;
             $thirtyDaysAgo = Carbon::now()->subDays(30);
 
-            // 1. Build query applying preferences and the 30-day rule
+            // 1. Build query applying the 30-day rule
             $query = Recipe::with('ingredients')
                 ->whereNotIn('slug', function ($subQuery) use ($thirtyDaysAgo, $userId) {
                     $subQuery->select('recipe_slug')
@@ -85,18 +86,36 @@ class PlanController extends Controller
                         ->where('scheduled_for', '>=', $thirtyDaysAgo);
                 });
 
-            // Casting to (array) satisfies Larastan, handles null values gracefully ([]),
-            // and respects Laravel's runtime casts without needing redundant type checks.
-            foreach ((array) $user->dietary_preferences as $pref) {
-                $query->whereJsonContains('categories', $pref);
+            // 2. Hybrid Preference Logic: "AND between groups, OR within the group"
+
+            // Group 1: Dietary Preferences
+            $dietPrefs = array_filter((array) $user->dietary_preferences);
+            if (! empty($dietPrefs)) {
+                $query->where(function (Builder $q) use ($dietPrefs) {
+                    foreach ($dietPrefs as $pref) {
+                        $q->orWhereJsonContains('categories', $pref);
+                    }
+                });
             }
 
-            foreach ((array) $user->fitness_goals as $pref) {
-                $query->whereJsonContains('categories', $pref);
+            // Group 2: Fitness Goals
+            $fitnessPrefs = array_filter((array) $user->fitness_goals);
+            if (! empty($fitnessPrefs)) {
+                $query->where(function (Builder $q) use ($fitnessPrefs) {
+                    foreach ($fitnessPrefs as $pref) {
+                        $q->orWhereJsonContains('categories', $pref);
+                    }
+                });
             }
 
-            foreach ((array) $user->logistics_preferences as $pref) {
-                $query->whereJsonContains('categories', $pref);
+            // Group 3: Logistics Preferences
+            $logisticsPrefs = array_filter((array) $user->logistics_preferences);
+            if (! empty($logisticsPrefs)) {
+                $query->where(function (Builder $q) use ($logisticsPrefs) {
+                    foreach ($logisticsPrefs as $pref) {
+                        $q->orWhereJsonContains('categories', $pref);
+                    }
+                });
             }
 
             $availableRecipes = $query->get();
@@ -113,11 +132,11 @@ class PlanController extends Controller
                 ], 400);
             }
 
-            // 2. Pick a random "Seed" recipe
+            // 3. Pick a random "Seed" recipe
             $seedRecipe = $availableRecipes->random();
             $selectedRecipes = collect([$seedRecipe]);
 
-            // 3. Find overlapping ingredients to minimize food waste
+            // 4. Find overlapping ingredients to minimize food waste
             if ($targetMeals > 1) {
                 $seedIngredientSlugs = DB::table('ingredient_recipe')
                     ->where('recipe_slug', $seedRecipe->slug)
@@ -139,7 +158,7 @@ class PlanController extends Controller
                 }
             }
 
-            // 4. Pad with random recipes if overlaps didn't yield enough meals
+            // 5. Pad with random recipes if overlaps didn't yield enough meals
             if ($selectedRecipes->count() < $targetMeals) {
                 $needed = $targetMeals - $selectedRecipes->count();
                 $paddingRecipes = $availableRecipes
@@ -149,7 +168,7 @@ class PlanController extends Controller
                 $selectedRecipes = $selectedRecipes->merge($paddingRecipes);
             }
 
-            // 5. Save the generated plan to the database using a transaction
+            // 6. Save the generated plan to the database using a transaction
             DB::beginTransaction();
 
             // Clear any upcoming generated meals

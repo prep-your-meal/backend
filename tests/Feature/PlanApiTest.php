@@ -97,4 +97,65 @@ class PlanApiTest extends TestCase
         // Verify the system only scheduled 4 meals, respecting the user's settings
         $this->assertDatabaseCount('meal_plans', 4);
     }
+
+    public function test_hybrid_preference_logic_filters_recipes_correctly()
+    {
+        // 1. Create a user with specific hybrid preferences
+        // Diet: vegan OR vegetarian
+        // Logistics: MUST be quick
+        $user = User::factory()->create([
+            'target_meals_per_week' => 2,
+            'dietary_preferences' => ['vegan', 'vegetarian'],
+            'fitness_goals' => [], // Empty, should be ignored
+            'logistics_preferences' => ['quick'],
+        ]);
+        Sanctum::actingAs($user, ['*']);
+
+        // 2. Create matching recipes (Valid)
+        Recipe::factory()->create([
+            'slug' => 'vegan-quick-meal',
+            'categories' => ['vegan', 'quick'],
+        ]);
+        Recipe::factory()->create([
+            'slug' => 'vegetarian-quick-meal',
+            'categories' => ['vegetarian', 'quick'],
+        ]);
+
+        // 3. Create trap recipes (Invalid)
+        Recipe::factory()->create([
+            'slug' => 'vegan-slow-meal',
+            'categories' => ['vegan', 'time-consuming'], // Fails logistics (not quick)
+        ]);
+        Recipe::factory()->create([
+            'slug' => 'meat-quick-meal',
+            'categories' => ['meat', 'quick'], // Fails diet (neither vegan nor vegetarian)
+        ]);
+
+        // 4. Generate the plan
+        $response = $this->postJson('/plan/generate');
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'status' => 'success',
+            ]);
+
+        // 5. Verify that exactly 2 meals were planned
+        $this->assertDatabaseCount('meal_plans', 2);
+
+        // 6. Verify that ONLY the matching recipes were selected
+        $this->assertDatabaseHas('meal_plans', [
+            'user_id' => $user->id,
+            'recipe_slug' => 'vegan-quick-meal',
+        ]);
+        $this->assertDatabaseHas('meal_plans', [
+            'user_id' => $user->id,
+            'recipe_slug' => 'vegetarian-quick-meal',
+        ]);
+
+        // Ensure the trap recipes were NOT selected
+        $this->assertDatabaseMissing('meal_plans', [
+            'user_id' => $user->id,
+            'recipe_slug' => 'vegan-slow-meal',
+        ]);
+    }
 }
