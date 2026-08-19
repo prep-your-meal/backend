@@ -17,6 +17,10 @@ class User extends Authenticatable
         'password',
         'provider',     // Für Social Login
         'provider_id',  // Für Social Login
+        'target_meals_per_week',
+        'dietary_preferences',
+        'fitness_goals',
+        'logistics_preferences',
     ];
 
     protected $hidden = [
@@ -29,6 +33,10 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            // Cast JSON columns to PHP arrays automatically
+            'dietary_preferences' => 'array',
+            'fitness_goals' => 'array',
+            'logistics_preferences' => 'array',
         ];
     }
 }

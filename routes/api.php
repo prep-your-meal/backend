@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\PlanController;
 use App\Http\Controllers\Api\ShoppingListController;
+use App\Http\Controllers\Api\UserPreferenceController;
 use App\Http\Controllers\Api\WebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -111,6 +112,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Meal Plan
     Route::get('/plan', [PlanController::class, 'current']);
     Route::post('/plan/generate', [PlanController::class, 'generate']);
+
+    // User Preferences (Wizard)
+    Route::get('/user/preferences', [UserPreferenceController::class, 'show'])->name('user.preferences.show');
+    Route::put('/user/preferences', [UserPreferenceController::class, 'update'])->name('user.preferences.update');
 
     // Shopping List
     Route::get('/shopping-list', [ShoppingListController::class, 'index']);
