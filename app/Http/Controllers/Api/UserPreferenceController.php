@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use OpenApi\Attributes as OA;
 
 class UserPreferenceController extends Controller
 {
@@ -18,36 +19,45 @@ class UserPreferenceController extends Controller
 
     private const ALLOWED_LOGISTICS = ['meal-prep-friendly', 'quick', 'one-pot'];
 
-    /**
-     * @OA\Get(
-     *     path="/api/user/preferences",
-     *     summary="Retrieve user preferences",
-     *     description="Returns the currently authenticated user's meal plan preferences.",
-     *     operationId="getUserPreferences",
-     *     tags={"User"},
-     *     security={{"sanctum": {}}},
-     *
-     *     @OA\Response(
-     *         response=200,
-     *         description="Successful operation",
-     *
-     *         @OA\JsonContent(
-     *
-     *             @OA\Property(property="status", type="string", example="success"),
-     *             @OA\Property(
-     *                 property="data",
-     *                 type="object",
-     *                 @OA\Property(property="target_meals_per_week", type="integer", example=3),
-     *                 @OA\Property(property="dietary_preferences", type="array", @OA\Items(type="string", example="vegan")),
-     *                 @OA\Property(property="fitness_goals", type="array", @OA\Items(type="string", example="high-protein")),
-     *                 @OA\Property(property="logistics_preferences", type="array", @OA\Items(type="string", example="meal-prep-friendly"))
-     *             )
-     *         )
-     *     ),
-     *
-     *     @OA\Response(response=401, description="Unauthenticated")
-     * )
-     */
+    #[OA\Get(
+        path: '/api/user/preferences',
+        summary: 'Retrieve user preferences',
+        description: "Returns the currently authenticated user's meal plan preferences.",
+        security: [['bearerAuth' => []]],
+        tags: ['User']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Successful operation',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'status', type: 'string', example: 'success'),
+                new OA\Property(
+                    property: 'data',
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'target_meals_per_week', type: 'integer', example: 3),
+                        new OA\Property(
+                            property: 'dietary_preferences',
+                            type: 'array',
+                            items: new OA\Items(type: 'string', example: 'vegan')
+                        ),
+                        new OA\Property(
+                            property: 'fitness_goals',
+                            type: 'array',
+                            items: new OA\Items(type: 'string', example: 'high-protein')
+                        ),
+                        new OA\Property(
+                            property: 'logistics_preferences',
+                            type: 'array',
+                            items: new OA\Items(type: 'string', example: 'meal-prep-friendly')
+                        ),
+                    ]
+                ),
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Unauthenticated')]
     public function show(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -63,39 +73,40 @@ class UserPreferenceController extends Controller
         ]);
     }
 
-    /**
-     * @OA\Put(
-     *     path="/api/user/preferences",
-     *     summary="Update user preferences",
-     *     description="Update the meal plan preferences for the authenticated user via the frontend wizard.",
-     *     operationId="updateUserPreferences",
-     *     tags={"User"},
-     *     security={{"sanctum": {}}},
-     *
-     *     @OA\RequestBody(
-     *         required=true,
-     *
-     *         @OA\JsonContent(
-     *             required={"target_meals_per_week"},
-     *
-     *             @OA\Property(property="target_meals_per_week", type="integer", example=4),
-     *             @OA\Property(property="dietary_preferences", type="array", @OA\Items(type="string", example="vegan")),
-     *             @OA\Property(property="fitness_goals", type="array", @OA\Items(type="string", example="high-protein")),
-     *             @OA\Property(property="logistics_preferences", type="array", @OA\Items(type="string", example="meal-prep-friendly"))
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=200,
-     *         description="Preferences updated successfully"
-     *     ),
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation Error"
-     *     ),
-     *     @OA\Response(response=401, description="Unauthenticated")
-     * )
-     */
+    #[OA\Put(
+        path: '/api/user/preferences',
+        summary: 'Update user preferences',
+        description: 'Update the meal plan preferences for the authenticated user via the frontend wizard.',
+        security: [['bearerAuth' => []]],
+        tags: ['User']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['target_meals_per_week'],
+            properties: [
+                new OA\Property(property: 'target_meals_per_week', type: 'integer', example: 4),
+                new OA\Property(
+                    property: 'dietary_preferences',
+                    type: 'array',
+                    items: new OA\Items(type: 'string', example: 'vegan')
+                ),
+                new OA\Property(
+                    property: 'fitness_goals',
+                    type: 'array',
+                    items: new OA\Items(type: 'string', example: 'high-protein')
+                ),
+                new OA\Property(
+                    property: 'logistics_preferences',
+                    type: 'array',
+                    items: new OA\Items(type: 'string', example: 'meal-prep-friendly')
+                ),
+            ]
+        )
+    )]
+    #[OA\Response(response: 200, description: 'Preferences updated successfully')]
+    #[OA\Response(response: 422, description: 'Validation Error')]
+    #[OA\Response(response: 401, description: 'Unauthenticated')]
     public function update(Request $request): JsonResponse
     {
         // Validate the incoming JSON payload against our allowed sets
