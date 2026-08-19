@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.4.0](https://github.com/prep-your-meal/backend/compare/v1.3.7...v1.4.0) (2026-08-19)
+
+
+### Features
+
+* **meal-plan:** implement smart generation algorithm ([6e653b0](https://github.com/prep-your-meal/backend/commit/6e653b0495314ff6992c634fde63acd4dda4c9e2))
+* **routing:** add permanent root redirect to api endpoint ([7983b5d](https://github.com/prep-your-meal/backend/commit/7983b5d0c8786ef8a02d0988f546b8c80a6be34e))
+* **user:** add user preferences for meal plan wizard ([48d1087](https://github.com/prep-your-meal/backend/commit/48d1087e630250dfba9b5d094bafa091f0dff830))
+
 ## [1.3.7](https://github.com/prep-your-meal/backend/compare/v1.3.6...v1.3.7) (2026-08-19)
 
 
