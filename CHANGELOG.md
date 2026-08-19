@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.5.1](https://github.com/prep-your-meal/backend/compare/v1.5.0...v1.5.1) (2026-08-19)
+
+
+### Bug Fixes
+
+* **swagger:** Broken link too logo ([baed2f1](https://github.com/prep-your-meal/backend/commit/baed2f17acaa5c00c8e89620ae3ebe9f24bc337e))
+
 ## [1.5.0](https://github.com/prep-your-meal/backend/compare/v1.4.1...v1.5.0) (2026-08-19)
 
 
