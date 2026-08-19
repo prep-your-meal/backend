@@ -13,9 +13,5 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::get('/', function () {
-    return response()->json([
-        'status' => 'error',
-        'message' => 'Not Found. Please use the /api endpoint.',
-    ], 404);
-});
+// Redirect requests from the root directory (/) permanently (301) to the /api endpoint
+Route::redirect('/', '/api', 301);
