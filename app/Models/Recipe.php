@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Enums\BudgetCategory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -30,11 +29,9 @@ class Recipe extends Model
         'protein_g',
         'carbs_g',
         'fat_g',
-        'budget',
     ];
 
     protected $casts = [
-        'budget' => BudgetCategory::class,
         'title' => 'array',
         'default_portions' => 'integer',
         'categories' => 'array',

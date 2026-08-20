@@ -33,9 +33,6 @@ return new class extends Migration
             $table->integer('carbs_g')->nullable();
             $table->integer('fat_g')->nullable();
 
-            // Kept nullable in case you still want to use your Budget Enum later
-            $table->integer('budget')->nullable();
-
             $table->timestamps();
         });
     }
