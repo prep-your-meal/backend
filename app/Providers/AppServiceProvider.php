@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Models\Recipe;
+use App\Observers\RecipeObserver;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
@@ -30,5 +32,7 @@ class AppServiceProvider extends ServiceProvider
             URL::forceRootUrl(config('app.url'));
             URL::forceScheme('https');
         }
+
+        Recipe::observe(RecipeObserver::class);
     }
 }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Recipe;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Cache;
 use OpenApi\Attributes as OA;
 
 class RecipeController extends Controller
@@ -27,8 +28,10 @@ class RecipeController extends Controller
     #[OA\Response(response: 404, description: 'Recipe not found')]
     public function show(string $slug): JsonResponse
     {
-        // firstOrFail() throws a 404 automatically if the slug doesn't exist
-        $recipe = Recipe::with('ingredients')->where('slug', $slug)->firstOrFail();
+        // Cache the recipe indefinitely. The RecipeObserver handles cache invalidation.
+        $recipe = Cache::rememberForever("recipe_{$slug}", function () use ($slug) {
+            return Recipe::with('ingredients')->where('slug', $slug)->firstOrFail();
+        });
 
         return response()->json([
             'status' => 'success',
