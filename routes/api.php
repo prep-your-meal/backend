@@ -6,10 +6,11 @@ use App\Http\Controllers\Api\RecipeController;
 use App\Http\Controllers\Api\ShoppingListController;
 use App\Http\Controllers\Api\UserPreferenceController;
 use App\Http\Controllers\Api\WebhookController;
+use App\Http\Controllers\Api\FavoriteController;
 use Illuminate\Support\Facades\Route;
 
 // Auth & Socialite
-Route::post('/auth/login', [AuthController::class, 'login']);
+Route::post('/auth/login', [AuthController::class, 'login'])->name('login');
 Route::get('/auth/{provider}/redirect', [AuthController::class, 'redirectToProvider']);
 Route::get('/auth/{provider}/callback', [AuthController::class, 'handleProviderCallback']);
 
@@ -130,5 +131,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Shopping List
     Route::get('/shopping-list', [ShoppingListController::class, 'index']);
+
+    // Favorites
+    Route::get('/favorites', [FavoriteController::class, 'index']);
+    Route::post('/favorites/{slug}/toggle', [FavoriteController::class, 'toggle']);
 
 });

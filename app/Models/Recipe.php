@@ -44,4 +44,10 @@ class Recipe extends Model
             ->withPivot('amount')
             ->withTimestamps();
     }
+
+    public function favoritedBy()
+    {
+        return $this->belongsToMany(\App\Models\User::class, 'recipe_user', 'recipe_slug', 'user_id')
+                    ->withTimestamps();
+    }
 }

@@ -41,4 +41,11 @@ class User extends Authenticatable
             'minimize_food_waste' => 'boolean',
         ];
     }
+
+    public function favoriteRecipes()
+    {
+        // Since we are not using the default ID convention, we must specify the custom keys explicitly
+        return $this->belongsToMany(\App\Models\Recipe::class, 'recipe_user', 'user_id', 'recipe_slug')
+                    ->withTimestamps();
+    }
 }
