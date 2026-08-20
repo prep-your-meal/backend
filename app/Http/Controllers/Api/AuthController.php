@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Password;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\AbstractProvider;
 use OpenApi\Attributes as OA;
@@ -222,5 +223,65 @@ class AuthController extends Controller
 
             return redirect()->to("{$frontendUrl}/auth/error");
         }
+    }
+
+    #[OA\Post(
+        path: '/auth/forgot-password',
+        summary: 'Send a password reset link',
+        tags: ['Auth']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(required: ['email'], properties: [
+            new OA\Property(property: 'email', type: 'string', format: 'email', example: 'user@example.com'),
+        ])
+    )]
+    #[OA\Response(response: 200, description: 'Reset link sent')]
+    #[OA\Response(response: 400, description: 'User not found')]
+    public function sendResetLinkEmail(Request $request): JsonResponse
+    {
+        $request->validate(['email' => 'required|email']);
+
+        $status = Password::sendResetLink($request->only('email'));
+
+        return $status === Password::RESET_LINK_SENT
+            ? response()->json(['status' => 'success', 'message' => __($status)])
+            : response()->json(['status' => 'error', 'message' => __($status)], 400);
+    }
+
+    #[OA\Post(
+        path: '/auth/reset-password',
+        summary: 'Reset the password using a token',
+        tags: ['Auth']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(required: ['email', 'password', 'password_confirmation', 'token'], properties: [
+            new OA\Property(property: 'token', type: 'string'),
+            new OA\Property(property: 'email', type: 'string', format: 'email'),
+            new OA\Property(property: 'password', type: 'string', format: 'password'),
+            new OA\Property(property: 'password_confirmation', type: 'string', format: 'password'),
+        ])
+    )]
+    #[OA\Response(response: 200, description: 'Password reset successfully')]
+    #[OA\Response(response: 400, description: 'Invalid token or mismatch')]
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $request->validate([
+            'token' => 'required',
+            'email' => 'required|email',
+            'password' => 'required|min:8|confirmed',
+        ]);
+
+        $status = Password::reset(
+            $request->only('email', 'password', 'password_confirmation', 'token'),
+            function ($user, $password) {
+                $user->forceFill(['password' => Hash::make($password)])->save();
+            }
+        );
+
+        return $status === Password::PASSWORD_RESET
+            ? response()->json(['status' => 'success', 'message' => __($status)])
+            : response()->json(['status' => 'error', 'message' => __($status)], 400);
     }
 }

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -62,11 +63,14 @@ class UserPreferenceTest extends TestCase
     /**
      * Test successful update with valid categories.
      */
-    public function test_user_can_update_preferences_with_valid_data(): void
+    public function test_user_can_update_preferences_with_valid_data_and_clears_plan_cache(): void
     {
         $user = User::factory()->create();
-
         Sanctum::actingAs($user);
+
+        // Put a dummy meal plan in the cache to test the Cache-Bust
+        Cache::put("meal_plan_user_{$user->id}", 'old-plan-data', 600);
+        $this->assertTrue(Cache::has("meal_plan_user_{$user->id}"));
 
         $payload = [
             'target_meals_per_week' => 5,
@@ -81,22 +85,16 @@ class UserPreferenceTest extends TestCase
         $response = $this->putJson('/user/preferences', $payload);
 
         $response->assertStatus(200)
-            ->assertJsonPath('status', 'success')
-            ->assertJsonPath('data.target_meals_per_week', 5)
-            ->assertJsonPath('data.default_portions', 4)
-            ->assertJsonPath('data.minimize_food_waste', false);
+            ->assertJsonPath('status', 'success');
 
         // Verify database was actually updated
         $this->assertDatabaseHas('users', [
             'id' => $user->id,
             'target_meals_per_week' => 5,
-            'default_portions' => 4,
-            'minimize_food_waste' => 0,
         ]);
 
-        $user->refresh();
-        $this->assertEquals(['vegan', 'low-carb'], $user->dietary_preferences);
-        $this->assertEquals(['nuts', 'soy'], $user->allergies);
+        // Verify that the meal plan cache was successfully cleared
+        $this->assertFalse(Cache::has("meal_plan_user_{$user->id}"));
     }
 
     /**

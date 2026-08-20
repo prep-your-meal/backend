@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -125,7 +126,6 @@ class AuthApiTest extends TestCase
         ]);
 
         $response->assertStatus(422)
-            // HIER FEHLTE DAS 'data' ALS ZWEITER PARAMETER
             ->assertJsonValidationErrors(['password'], 'data');
     }
 
@@ -146,5 +146,47 @@ class AuthApiTest extends TestCase
                     'name' => 'Test User',
                 ],
             ]);
+    }
+
+    public function test_user_can_request_password_reset_link()
+    {
+        $user = User::factory()->create([
+            'email' => 'reset@prepyourmeal.local',
+        ]);
+
+        $response = $this->postJson('/auth/forgot-password', [
+            'email' => 'reset@prepyourmeal.local',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'status' => 'success',
+            ]);
+    }
+
+    public function test_user_can_reset_password_with_valid_token()
+    {
+        $user = User::factory()->create([
+            'email' => 'reset@prepyourmeal.local',
+            'password' => Hash::make('oldpassword123'),
+        ]);
+
+        // Generate a valid reset token directly via Laravel's Password Broker
+        $token = Password::broker()->createToken($user);
+
+        $response = $this->postJson('/auth/reset-password', [
+            'email' => 'reset@prepyourmeal.local',
+            'token' => $token,
+            'password' => 'newpassword123',
+            'password_confirmation' => 'newpassword123',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'status' => 'success',
+            ]);
+
+        // Verify the password was actually changed in the database
+        $this->assertTrue(Hash::check('newpassword123', $user->fresh()->password));
     }
 }

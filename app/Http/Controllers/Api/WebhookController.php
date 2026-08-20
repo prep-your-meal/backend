@@ -49,7 +49,7 @@ class WebhookController extends Controller
                 'message' => 'Successfully synced '.count($parsedRecipes).' recipes and master ingredients to the database.',
             ]);
 
-            // NEW: Throwable catches EVERYTHING, including fatal PHP 8 TypeErrors
+            // Throwable catches EVERYTHING, including fatal PHP 8 TypeErrors
         } catch (\Throwable $e) {
             Log::error('GitHub Sync Error: '.$e->getMessage());
 
@@ -116,17 +116,25 @@ class WebhookController extends Controller
             if (! empty($directories)) {
                 $repoRoot = $directories[0];
 
-                // Copy ingredients.yaml from repo root if it exists
+                // 1. Copy ingredients.yaml
                 $yamlSource = $repoRoot.'/ingredients.yaml';
                 if (File::exists($yamlSource)) {
                     File::copy($yamlSource, $destinationPath.'/ingredients.yaml');
                 }
 
-                // Copy recipes directory recursively (preserving de/ and en/ structures)
+                // 2. Copy markdown recipes
                 $recipesSource = $repoRoot.'/recipes';
                 if (File::exists($recipesSource)) {
                     File::ensureDirectoryExists($destinationPath.'/recipes');
                     File::copyDirectory($recipesSource, $destinationPath.'/recipes');
+                }
+
+                // 3. Copy images directly to the public folder
+                $imagesSource = $repoRoot.'/recipes/images';
+                if (File::exists($imagesSource)) {
+                    $publicImagesPath = public_path('recipes/images');
+                    File::ensureDirectoryExists($publicImagesPath);
+                    File::copyDirectory($imagesSource, $publicImagesPath);
                 }
             }
 
@@ -209,12 +217,11 @@ class WebhookController extends Controller
                     if (! isset($groupedRecipes[$canonicalSlug])) {
                         $groupedRecipes[$canonicalSlug] = $yamlData;
                         $groupedRecipes[$canonicalSlug]['title'] = [];
-                        $groupedRecipes[$canonicalSlug]['instructions'] = []; // NEW: Prepare array for instructions
+                        $groupedRecipes[$canonicalSlug]['instructions'] = [];
                     }
 
                     $groupedRecipes[$canonicalSlug]['title'][$lang] = $yamlData['title'];
 
-                    // NEW: Read and store the markdown body (everything below the YAML front matter)
                     $groupedRecipes[$canonicalSlug]['instructions'][$lang] = trim($document->body());
                 }
             }
@@ -236,7 +243,7 @@ class WebhookController extends Controller
                     ['slug' => $yamlData['slug']],
                     [
                         'title' => $yamlData['title'],
-                        'instructions' => $yamlData['instructions'] ?? null, // NEW: Store instructions
+                        'instructions' => $yamlData['instructions'] ?? null,
                         'image' => $yamlData['image'] ?? null,
                         'prep_time' => $yamlData['prep_time'] ?? null,
                         'cook_time' => $yamlData['cook_time'] ?? null,
@@ -277,7 +284,7 @@ class WebhookController extends Controller
 
                 $recipe->ingredients()->sync($syncData);
 
-                // NEW: Cache-Busting! Clear the old cache for this specific recipe to serve fresh data.
+                // Cache-Busting! Clear the old cache for this specific recipe to serve fresh data.
                 Cache::forget("recipe_{$recipe->slug}");
             }
 

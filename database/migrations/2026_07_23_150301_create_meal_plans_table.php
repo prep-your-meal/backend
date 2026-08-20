@@ -23,7 +23,7 @@ return new class extends Migration
             // When is/was this meal scheduled to be eaten?
             $table->date('scheduled_for');
 
-            // NEW: How many portions are planned for this specific meal on this day
+            // How many portions are planned for this specific meal on this day
             $table->integer('portions')->default(1);
 
             $table->timestamps();

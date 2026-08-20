@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
 use OpenApi\Attributes as OA;
 
@@ -149,6 +150,9 @@ class UserPreferenceController extends Controller
 
         $user = $request->user();
         $user->update($validated);
+
+        // Invalidate the generated plan cache so new preferences apply immediately
+        Cache::forget("meal_plan_user_{$user->id}");
 
         return response()->json([
             'status' => 'success',
