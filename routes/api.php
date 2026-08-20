@@ -2,12 +2,15 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\FavoriteController;
+use App\Http\Controllers\Api\MetaController;
 use App\Http\Controllers\Api\PlanController;
 use App\Http\Controllers\Api\RecipeController;
 use App\Http\Controllers\Api\ShoppingListController;
 use App\Http\Controllers\Api\UserPreferenceController;
 use App\Http\Controllers\Api\WebhookController;
 use Illuminate\Support\Facades\Route;
+
+// --- Public Routes ---
 
 // Auth & Socialite
 Route::post('/auth/login', [AuthController::class, 'login'])->name('login');
@@ -17,10 +20,13 @@ Route::get('/auth/{provider}/callback', [AuthController::class, 'handleProviderC
 // GitHub Webhook
 Route::post('/webhooks/github', [WebhookController::class, 'handle']);
 
+// Meta
+Route::get('/meta/categories', [MetaController::class, 'categories']);
+
 // Recipes
 // List all recipes with pagination and filtering (max 60 requests per minute)
 Route::get('/recipes', [RecipeController::class, 'index'])
-    ->middleware(['throttle:60,1']);
+    ->middleware('throttle:60,1');
 // Limit to 30 requests per minute per user/IP to prevent flooding and scraping
 Route::get('/recipes/{slug}', [RecipeController::class, 'show'])
     ->middleware('throttle:30,1');
@@ -36,7 +42,7 @@ Route::get('/recipes/{slug}', [RecipeController::class, 'show'])
 |
 */
 
-// / Serve Swagger assets (CSS, JS, PNG)
+// Serve Swagger assets (CSS, JS, PNG)
 Route::get('/docs/asset/{asset}', function ($asset) {
     // List of all possible storage locations (Strato + local vendor directories)
     $paths = [
@@ -85,23 +91,6 @@ Route::get('/docs/{file?}', function ($file = 'api-docs.json') {
     abort(404, 'Swagger documentation JSON not found.');
 })->name('l5-swagger.default.docs');
 
-// Serve the generated JSON documentation for Swagger (static file bypass)
-Route::get('/docs/{file?}', function ($file = 'api-docs.json') {
-    // 1. Check public path (Production / Strato Workaround)
-    $path = public_path("docs/{$file}");
-
-    // 2. Fallback to storage path (Local Development / Sail)
-    if (! file_exists($path)) {
-        $path = storage_path("api-docs/{$file}");
-    }
-
-    if (file_exists($path)) {
-        return response()->file($path, ['Content-Type' => 'application/json']);
-    }
-
-    abort(404, 'Swagger documentation JSON not found.');
-})->name('l5-swagger.default.asset');
-
 // Serve general information about the api
 Route::get('/', function () {
     return response()->json([
@@ -110,20 +99,25 @@ Route::get('/', function () {
             'name' => config('app.name'),
             'environment' => config('app.env'),
             'status' => 'running',
-            'documentation' => route('l5-swagger.default.api'),
-            'version' => API_VERSION,
+            'documentation' => route('l5-swagger.default.docs'),
+            'version' => defined('API_VERSION') ? API_VERSION : '1.0.0', // Safe fallback if constant is missing
         ],
     ]);
-})->name('l5-swagger.default.docs');
+})->name('api.info');
 
-// --- Protected routes ---
+// --- Protected Routes ---
 Route::middleware('auth:sanctum')->group(function () {
+
+    // Auth & User Profile
+    Route::post('/auth/logout', [AuthController::class, 'logout']);
+    Route::delete('/user', [AuthController::class, 'destroy']);
 
     // Meal Plan
     Route::get('/plan', [PlanController::class, 'current']);
-    // Limit plan generation to 5 requests per minute per user/IP
+    // Limit plan generation to 5 requests per minute per user/IP (auth:sanctum is already inherited)
     Route::post('/plan/generate', [PlanController::class, 'generate'])
-        ->middleware(['auth:sanctum', 'throttle:5,1']);
+        ->middleware('throttle:5,1');
+    Route::put('/plan/{date}/swap', [PlanController::class, 'swap']);
 
     // User Preferences (Wizard)
     Route::get('/user/preferences', [UserPreferenceController::class, 'show'])->name('user.preferences.show');

@@ -2,9 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Models\MealPlan;
 use App\Models\Recipe;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -196,7 +198,7 @@ class PlanApiTest extends TestCase
 
         // Ensure only the two safe recipes were selected
         $this->assertDatabaseCount('meal_plans', 2);
-        
+
         $this->assertDatabaseMissing('meal_plans', [
             'user_id' => $user->id,
             'recipe_slug' => 'dangerous-nut-recipe',
@@ -246,5 +248,56 @@ class PlanApiTest extends TestCase
 
         // Should still generate the requested number of meals via random padding
         $this->assertDatabaseCount('meal_plans', 3);
+    }
+
+    public function test_user_can_swap_a_scheduled_meal()
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user, ['*']);
+
+        // Create two recipes
+        $recipe1 = Recipe::factory()->create(['slug' => 'first-recipe']);
+        $recipe2 = Recipe::factory()->create(['slug' => 'alternative-recipe']);
+
+        // Schedule the first recipe for today
+        $today = Carbon::today()->format('Y-m-d');
+        MealPlan::create([
+            'user_id' => $user->id,
+            'recipe_slug' => $recipe1->slug,
+            'scheduled_for' => $today,
+            'portions' => 2,
+        ]);
+
+        // Attempt to swap it
+        $response = $this->putJson("/plan/{$today}/swap");
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'status' => 'success',
+                'message' => 'Meal successfully swapped.',
+            ]);
+
+        // Assert the database has been updated to the alternative recipe
+        $this->assertDatabaseHas('meal_plans', [
+            'user_id' => $user->id,
+            'scheduled_for' => $today,
+            'recipe_slug' => $recipe2->slug,
+        ]);
+    }
+
+    public function test_swap_fails_if_no_meal_is_scheduled_for_date()
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user, ['*']);
+
+        $tomorrow = Carbon::tomorrow()->format('Y-m-d');
+
+        $response = $this->putJson("/plan/{$tomorrow}/swap");
+
+        $response->assertStatus(404)
+            ->assertJson([
+                'status' => 'error',
+                'message' => 'No meal scheduled for this date.',
+            ]);
     }
 }

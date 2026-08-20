@@ -29,8 +29,6 @@ class PlanController extends Controller
             $today = Carbon::today();
             $userId = $request->user()->id;
 
-            // Wrap the existing Eloquent query inside a Cache::remember block.
-            // TTL is set to the end of the current week.
             $currentPlan = Cache::remember("meal_plan_user_{$userId}", now()->endOfWeek(), function () use ($userId, $today) {
                 return MealPlan::with(['recipe.ingredients'])
                     ->where('user_id', $userId)
@@ -79,73 +77,15 @@ class PlanController extends Controller
             $userId = $user->id;
 
             $targetMeals = $user->target_meals_per_week ?? 7;
-            
-            // NEW: Fetch default portions to dynamically scale the shopping list
             $defaultPortions = $user->default_portions ?? 2;
-            
-            $thirtyDaysAgo = Carbon::now()->subDays(30);
 
-            // 1. Build query applying the 30-day rule
-            $query = Recipe::with('ingredients')
-                ->whereNotIn('slug', function ($subQuery) use ($thirtyDaysAgo, $userId) {
-                    $subQuery->select('recipe_slug')
-                        ->from('meal_plans')
-                        ->where('user_id', $userId)
-                        ->where('scheduled_for', '>=', $thirtyDaysAgo);
-                });
-
-            // 2. Hybrid Preference Logic: "AND between groups, OR within the group"
-
-            $dietPrefs = array_filter((array) $user->dietary_preferences);
-            if (! empty($dietPrefs)) {
-                $query->where(function (Builder $q) use ($dietPrefs) {
-                    foreach ($dietPrefs as $pref) {
-                        $q->orWhereJsonContains('categories', $pref);
-                    }
-                });
-            }
-
-            $fitnessPrefs = array_filter((array) $user->fitness_goals);
-            if (! empty($fitnessPrefs)) {
-                $query->where(function (Builder $q) use ($fitnessPrefs) {
-                    foreach ($fitnessPrefs as $pref) {
-                        $q->orWhereJsonContains('categories', $pref);
-                    }
-                });
-            }
-
-            $logisticsPrefs = array_filter((array) $user->logistics_preferences);
-            if (! empty($logisticsPrefs)) {
-                $query->where(function (Builder $q) use ($logisticsPrefs) {
-                    foreach ($logisticsPrefs as $pref) {
-                        $q->orWhereJsonContains('categories', $pref);
-                    }
-                });
-            }
-
-            // NEW: Group 4 - Allergies (STRICT BLACKLIST)
-            $allergies = array_filter((array) $user->allergies);
-            if (! empty($allergies)) {
-                foreach ($allergies as $allergy) {
-                    // Exclude any recipe where the categories array contains the allergen tag
-                    $query->whereJsonDoesntContain('categories', $allergy);
-                }
-            }
-
+            // 1. Build query using our centralized preference logic
+            $query = $this->buildPreferenceQuery($user);
             $availableRecipes = $query->get();
 
-            // Fallback: If strict preferences + 30-day rule yields nothing, drop the 30-day rule
+            // Fallback: Drop nice-to-have preferences, but KEEP strict allergy blacklist
             if ($availableRecipes->isEmpty()) {
-                $fallbackQuery = Recipe::with('ingredients');
-                
-                // CRITICAL FIX: We drop nice-to-have preferences, but we MUST keep the allergy blacklist!
-                if (! empty($allergies)) {
-                    foreach ($allergies as $allergy) {
-                        $fallbackQuery->whereJsonDoesntContain('categories', $allergy);
-                    }
-                }
-                
-                $availableRecipes = $fallbackQuery->get();
+                $availableRecipes = $this->buildAllergyFallbackQuery($user)->get();
             }
 
             if ($availableRecipes->isEmpty()) {
@@ -156,9 +96,9 @@ class PlanController extends Controller
             }
 
             // 3. Pick a random "Seed" recipe
+            /** @var Recipe $seedRecipe */
             $seedRecipe = $availableRecipes->random();
             $selectedRecipes = collect([$seedRecipe]);
-
             $shouldMinimizeWaste = $user->minimize_food_waste ?? true;
 
             // 4. Find overlapping ingredients to minimize food waste
@@ -193,24 +133,22 @@ class PlanController extends Controller
                 $selectedRecipes = $selectedRecipes->merge($paddingRecipes);
             }
 
-            // 6. Save the generated plan to the database using a transaction
+            // 6. Save the generated plan
             DB::beginTransaction();
-
-            MealPlan::where('user_id', $userId)
-                ->where('scheduled_for', '>=', Carbon::today())
-                ->delete();
+            MealPlan::where('user_id', $userId)->where('scheduled_for', '>=', Carbon::today())->delete();
 
             $startDate = Carbon::today();
             $planResponse = [];
 
             foreach ($selectedRecipes as $index => $recipe) {
+                /** @var Recipe $recipe */
                 $scheduledDate = $startDate->copy()->addDays($index);
 
                 MealPlan::create([
                     'user_id' => $userId,
                     'recipe_slug' => $recipe->slug,
                     'scheduled_for' => $scheduledDate->format('Y-m-d'),
-                    'portions' => $defaultPortions, // FIX: Dynamically applied from user preferences
+                    'portions' => $defaultPortions,
                 ]);
 
                 $planResponse[] = [
@@ -220,7 +158,6 @@ class PlanController extends Controller
             }
 
             DB::commit();
-
             Cache::forget("meal_plan_user_{$userId}");
 
             return response()->json([
@@ -238,5 +175,126 @@ class PlanController extends Controller
                 'message' => 'Failed to generate meal plan.',
             ], 500);
         }
+    }
+
+    #[OA\Put(
+        path: '/plan/{date}/swap',
+        summary: 'Swap a specific meal in the plan',
+        security: [['bearerAuth' => []]],
+        tags: ['Meal Plan']
+    )]
+    public function swap(Request $request, string $date): JsonResponse
+    {
+        $user = $request->user();
+
+        $mealPlan = MealPlan::where('user_id', $user->id)
+            ->where('scheduled_for', $date)
+            ->first();
+
+        if (! $mealPlan) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'No meal scheduled for this date.',
+            ], 404);
+        }
+
+        $query = $this->buildPreferenceQuery($user);
+        $query->where('slug', '!=', $mealPlan->recipe_slug);
+
+        $availableRecipes = $query->get();
+
+        if ($availableRecipes->isEmpty()) {
+            $fallbackQuery = $this->buildAllergyFallbackQuery($user);
+            $fallbackQuery->where('slug', '!=', $mealPlan->recipe_slug);
+            $availableRecipes = $fallbackQuery->get();
+        }
+
+        if ($availableRecipes->isEmpty()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'No alternative recipes available.',
+            ], 400);
+        }
+
+        /** @var Recipe $newRecipe */
+        $newRecipe = $availableRecipes->random();
+
+        $mealPlan->update(['recipe_slug' => $newRecipe->slug]);
+        Cache::forget("meal_plan_user_{$user->id}");
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Meal successfully swapped.',
+            'data' => $mealPlan->load('recipe.ingredients'),
+        ]);
+    }
+
+    /**
+     * Reusable query builder for strict user preferences and 30-day rule.
+     */
+    private function buildPreferenceQuery($user): Builder
+    {
+        $thirtyDaysAgo = Carbon::now()->subDays(30);
+
+        $query = Recipe::with('ingredients')
+            ->whereNotIn('slug', function ($subQuery) use ($thirtyDaysAgo, $user) {
+                $subQuery->select('recipe_slug')
+                    ->from('meal_plans')
+                    ->where('user_id', $user->id)
+                    ->where('scheduled_for', '>=', $thirtyDaysAgo);
+            });
+
+        $dietPrefs = array_filter((array) $user->dietary_preferences);
+        if (! empty($dietPrefs)) {
+            $query->where(function (Builder $q) use ($dietPrefs) {
+                foreach ($dietPrefs as $pref) {
+                    $q->orWhereJsonContains('categories', $pref);
+                }
+            });
+        }
+
+        $fitnessPrefs = array_filter((array) $user->fitness_goals);
+        if (! empty($fitnessPrefs)) {
+            $query->where(function (Builder $q) use ($fitnessPrefs) {
+                foreach ($fitnessPrefs as $pref) {
+                    $q->orWhereJsonContains('categories', $pref);
+                }
+            });
+        }
+
+        $logisticsPrefs = array_filter((array) $user->logistics_preferences);
+        if (! empty($logisticsPrefs)) {
+            $query->where(function (Builder $q) use ($logisticsPrefs) {
+                foreach ($logisticsPrefs as $pref) {
+                    $q->orWhereJsonContains('categories', $pref);
+                }
+            });
+        }
+
+        $allergies = array_filter((array) $user->allergies);
+        if (! empty($allergies)) {
+            foreach ($allergies as $allergy) {
+                $query->whereJsonDoesntContain('categories', $allergy);
+            }
+        }
+
+        return $query;
+    }
+
+    /**
+     * Reusable fallback query that ONLY respects the allergy blacklist.
+     */
+    private function buildAllergyFallbackQuery($user): Builder
+    {
+        $query = Recipe::with('ingredients');
+
+        $allergies = array_filter((array) $user->allergies);
+        if (! empty($allergies)) {
+            foreach ($allergies as $allergy) {
+                $query->whereJsonDoesntContain('categories', $allergy);
+            }
+        }
+
+        return $query;
     }
 }

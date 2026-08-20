@@ -117,7 +117,7 @@ ingredients:
         $this->assertNotNull($recipe);
         $this->assertEquals('Chicken Curry', $recipe->title['en']);
         $this->assertStringContainsString('Cook the chicken.', $recipe->instructions['en']);
-        
+
         // Assert that the categories were successfully extracted and stored (including the allergy tag)
         $this->assertIsArray($recipe->categories);
         $this->assertContains('high-protein', $recipe->categories);

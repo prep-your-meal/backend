@@ -49,7 +49,7 @@ class UserPreferenceTest extends TestCase
                     'fitness_goals',
                     'logistics_preferences',
                     'allergies',             // <-- NEW
-                    'minimize_food_waste', 
+                    'minimize_food_waste',
                 ],
             ])
             ->assertJsonPath('data.target_meals_per_week', 3)
@@ -75,7 +75,7 @@ class UserPreferenceTest extends TestCase
             'fitness_goals' => ['high-protein'],
             'logistics_preferences' => ['family-friendly'],
             'allergies' => ['nuts', 'soy'],
-            'minimize_food_waste' => false, 
+            'minimize_food_waste' => false,
         ];
 
         $response = $this->putJson('/user/preferences', $payload);
@@ -84,7 +84,7 @@ class UserPreferenceTest extends TestCase
             ->assertJsonPath('status', 'success')
             ->assertJsonPath('data.target_meals_per_week', 5)
             ->assertJsonPath('data.default_portions', 4)
-            ->assertJsonPath('data.minimize_food_waste', false); 
+            ->assertJsonPath('data.minimize_food_waste', false);
 
         // Verify database was actually updated
         $this->assertDatabaseHas('users', [
@@ -111,7 +111,7 @@ class UserPreferenceTest extends TestCase
         $payload = [
             'target_meals_per_week' => 4,
             'default_portions' => 2,
-            'dietary_preferences' => ['carnivore'], 
+            'dietary_preferences' => ['carnivore'],
             'fitness_goals' => ['super-strong'],
             'allergies' => ['dust'],
             'minimize_food_waste' => 'yes-please',

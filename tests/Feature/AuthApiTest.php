@@ -52,4 +52,45 @@ class AuthApiTest extends TestCase
                 'message' => 'Invalid credentials',
             ]);
     }
+
+    public function test_authenticated_user_can_logout()
+    {
+        $user = User::factory()->create();
+        // Create an actual token to test revocation
+        $token = $user->createToken('test-token')->plainTextToken;
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$token,
+        ])->postJson('/auth/logout');
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'status' => 'success',
+                'message' => 'Successfully logged out.',
+            ]);
+
+        // Ensure token was deleted from database
+        $this->assertDatabaseCount('personal_access_tokens', 0);
+    }
+
+    public function test_authenticated_user_can_delete_their_account()
+    {
+        $user = User::factory()->create();
+        $token = $user->createToken('test-token')->plainTextToken;
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$token,
+        ])->deleteJson('/user');
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'status' => 'success',
+                'message' => 'Account permanently deleted.',
+            ]);
+
+        // Ensure user is gone
+        $this->assertDatabaseMissing('users', [
+            'id' => $user->id,
+        ]);
+    }
 }

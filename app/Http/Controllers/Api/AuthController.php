@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -53,6 +54,46 @@ class AuthController extends Controller
             'status' => 'success',
             'token' => $token,
             'user' => $user,
+        ]);
+    }
+
+    #[OA\Post(
+        path: '/auth/logout',
+        summary: 'Logout user and revoke current token',
+        security: [['bearerAuth' => []]],
+        tags: ['Auth']
+    )]
+    public function logout(Request $request): JsonResponse
+    {
+        // Revokes the token that was used to authenticate the current request
+        $request->user()->currentAccessToken()->delete();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Successfully logged out.',
+        ]);
+    }
+
+    #[OA\Delete(
+        path: '/user',
+        summary: 'Delete user account permanently',
+        security: [['bearerAuth' => []]],
+        tags: ['User']
+    )]
+    public function destroy(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        // Revoke all tokens
+        $user->tokens()->delete();
+
+        // Delete the user (cascading will handle meal plans and favorite relationships
+        // if constrained()->cascadeOnDelete() is set in migrations)
+        $user->delete();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Account permanently deleted.',
         ]);
     }
 

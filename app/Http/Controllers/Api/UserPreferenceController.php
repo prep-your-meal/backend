@@ -13,13 +13,13 @@ class UserPreferenceController extends Controller
     /**
      * Allowed categories based on the defined backend sets.
      */
-    private const ALLOWED_DIETS = ['vegan', 'vegetarian', 'keto', 'low-carb', 'gluten-free', 'dairy-free'];
+    public const ALLOWED_DIETS = ['vegan', 'vegetarian', 'keto', 'low-carb', 'gluten-free', 'dairy-free'];
 
-    private const ALLOWED_FITNESS = ['high-protein', 'bulking', 'cutting', 'balanced'];
+    public const ALLOWED_FITNESS = ['high-protein', 'bulking', 'cutting', 'balanced'];
 
-    private const ALLOWED_LOGISTICS = ['meal-prep-friendly', 'quick', 'one-pot', 'family-friendly']; 
+    public const ALLOWED_LOGISTICS = ['meal-prep-friendly', 'quick', 'one-pot', 'family-friendly'];
 
-    private const ALLOWED_ALLERGIES = ['nuts', 'shellfish', 'soy', 'eggs', 'lactose', 'gluten'];
+    public const ALLOWED_ALLERGIES = ['nuts', 'shellfish', 'soy', 'eggs', 'lactose', 'gluten'];
 
     #[OA\Get(
         path: '/user/preferences',
@@ -140,7 +140,7 @@ class UserPreferenceController extends Controller
 
             'logistics_preferences' => ['nullable', 'array'],
             'logistics_preferences.*' => ['string', Rule::in(self::ALLOWED_LOGISTICS)],
-            
+
             'allergies' => ['nullable', 'array'],
             'allergies.*' => ['string', Rule::in(self::ALLOWED_ALLERGIES)],
 
