@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.7.0](https://github.com/prep-your-meal/backend/compare/v1.6.0...v1.7.0) (2026-08-20)
+
+
+### Features
+
+* **api:** add manual plan control, registration, and fix swagger generation ([0237b72](https://github.com/prep-your-meal/backend/commit/0237b72b5c409d058b0af8c199f3c3409ca21ce7))
+
 ## [1.6.0](https://github.com/prep-your-meal/backend/compare/v1.5.4...v1.6.0) (2026-08-20)
 
 
