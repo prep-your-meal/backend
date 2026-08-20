@@ -28,7 +28,10 @@ class ShoppingListApiTest extends TestCase
         $response->assertStatus(200)
             ->assertJson([
                 'status' => 'success',
-                'data' => [],
+                'data' => [
+                    'recipes' => [],
+                    'custom_items' => [],
+                ],
             ]);
     }
 }

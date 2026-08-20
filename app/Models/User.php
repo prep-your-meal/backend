@@ -51,4 +51,9 @@ class User extends Authenticatable
         return $this->belongsToMany(Recipe::class, 'recipe_user', 'user_id', 'recipe_slug')
             ->withTimestamps();
     }
+
+    public function customShoppingItems()
+    {
+        return $this->hasMany(CustomShoppingItem::class);
+    }
 }

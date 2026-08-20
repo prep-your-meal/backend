@@ -26,14 +26,26 @@ class ShoppingListController extends Controller
             $today = Carbon::today();
             $userId = $request->user()->id;
 
-            // Fetch current meal plan including recipes and their ingredients
+            // 1. Always fetch custom items first to ensure they are never lost
+            $customItems = $request->user()->customShoppingItems()
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            // 2. Fetch the current meal plan
             $currentPlan = MealPlan::with(['recipe.ingredients'])
                 ->where('user_id', $userId)
                 ->where('scheduled_for', '>=', $today)
                 ->get();
 
+            // 3. Early return if the meal plan is empty (keeping custom items intact)
             if ($currentPlan->isEmpty()) {
-                return response()->json(['status' => 'success', 'data' => []]);
+                return response()->json([
+                    'status' => 'success',
+                    'data' => [
+                        'recipes' => [],
+                        'custom_items' => $customItems,
+                    ],
+                ]);
             }
 
             $ingredientsMap = [];
@@ -45,11 +57,7 @@ class ShoppingListController extends Controller
 
                 /** @var Recipe $recipe */
                 $recipe = $plan->recipe;
-
-                // The amount of portions planned for this specific meal on this day
                 $plannedPortions = $plan->portions;
-
-                // The amount of portions the original recipe was designed for (fallback to 1 to prevent division by zero)
                 $defaultPortions = $recipe->default_portions > 0 ? $recipe->default_portions : 1;
 
                 foreach ($recipe->ingredients as $ingredient) {
@@ -58,8 +66,6 @@ class ShoppingListController extends Controller
 
                     /** @phpstan-ignore-next-line */
                     $baseAmount = $ingredient->pivot->amount;
-
-                    // CORE LOGIC: Scale the ingredient amount dynamically based on planned portions
                     $scaledAmount = ($baseAmount / $defaultPortions) * $plannedPortions;
 
                     if (! isset($ingredientsMap[$slug])) {
@@ -78,7 +84,6 @@ class ShoppingListController extends Controller
             $categorizedList = [];
 
             foreach ($ingredientsMap as $item) {
-                // Round the final aggregated amount to 2 decimal places for cleaner output
                 $item['total_amount'] = round($item['total_amount'], 2);
                 $category = $item['category'];
 
@@ -89,9 +94,13 @@ class ShoppingListController extends Controller
                 $categorizedList[$category][] = $item;
             }
 
+            // 4. Return the correctly populated variable ($categorizedList)
             return response()->json([
                 'status' => 'success',
-                'data' => $categorizedList,
+                'data' => [
+                    'recipes' => $categorizedList,
+                    'custom_items' => $customItems,
+                ],
             ]);
 
         } catch (\Exception $e) {

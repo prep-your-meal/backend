@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CustomShoppingItemController;
 use App\Http\Controllers\Api\FavoriteController;
 use App\Http\Controllers\Api\MetaController;
 use App\Http\Controllers\Api\PlanController;
@@ -135,6 +136,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Shopping List
     Route::get('/shopping-list', [ShoppingListController::class, 'index']);
+    Route::post('/shopping-list/custom', [CustomShoppingItemController::class, 'store']);
+    Route::delete('/shopping-list/custom/completed', [CustomShoppingItemController::class, 'clearCompleted']);
+    Route::put('/shopping-list/custom/{id}/toggle', [CustomShoppingItemController::class, 'toggle']);
+    Route::delete('/shopping-list/custom/{id}', [CustomShoppingItemController::class, 'destroy']);
 
     // Favorites
     Route::get('/favorites', [FavoriteController::class, 'index']);

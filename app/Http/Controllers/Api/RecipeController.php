@@ -43,7 +43,6 @@ class RecipeController extends Controller
 
         // 2. Transform the paginated items to flatten the localized title for the frontend
         $recipes->getCollection()->transform(function ($recipe) use ($locale) {
-            // Larastan weiß, dass $recipe->title ein Array ist. Keine Prüfung nötig.
             $recipe->title = $recipe->title[$locale] ?? $recipe->title['en'] ?? $recipe->slug;
 
             return $recipe;
