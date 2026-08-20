@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.8.1](https://github.com/prep-your-meal/backend/compare/v1.8.0...v1.8.1) (2026-08-20)
+
 ## [1.8.0](https://github.com/prep-your-meal/backend/compare/v1.7.0...v1.8.0) (2026-08-20)
 
 
