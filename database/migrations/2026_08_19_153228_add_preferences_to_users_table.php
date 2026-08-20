@@ -15,12 +15,16 @@ return new class extends Migration
             // How many meals the user wants generated per week
             $table->integer('target_meals_per_week')->default(3)->after('provider_id');
 
+            $table->integer('default_portions')->default(2);
+
             // JSON arrays to store the specific wizard selections
             // e.g., ["vegan", "dairy-free"]
             $table->json('dietary_preferences')->nullable()->after('target_meals_per_week');
 
             // e.g., ["high-protein", "cutting"]
             $table->json('fitness_goals')->nullable()->after('dietary_preferences');
+
+            $table->json('allergies')->nullable();
 
             // e.g., ["meal-prep-friendly", "one-pot"]
             $table->json('logistics_preferences')->nullable()->after('fitness_goals');

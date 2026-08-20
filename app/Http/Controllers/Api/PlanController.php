@@ -29,7 +29,7 @@ class PlanController extends Controller
             $today = Carbon::today();
             $userId = $request->user()->id;
 
-            // NEW: Wrap the existing Eloquent query inside a Cache::remember block.
+            // Wrap the existing Eloquent query inside a Cache::remember block.
             // TTL is set to the end of the current week.
             $currentPlan = Cache::remember("meal_plan_user_{$userId}", now()->endOfWeek(), function () use ($userId, $today) {
                 return MealPlan::with(['recipe.ingredients'])
@@ -78,8 +78,11 @@ class PlanController extends Controller
             $user = $request->user();
             $userId = $user->id;
 
-            // Retrieve target meals from user preferences, fallback to 7 if not set
             $targetMeals = $user->target_meals_per_week ?? 7;
+            
+            // NEW: Fetch default portions to dynamically scale the shopping list
+            $defaultPortions = $user->default_portions ?? 2;
+            
             $thirtyDaysAgo = Carbon::now()->subDays(30);
 
             // 1. Build query applying the 30-day rule
@@ -93,7 +96,6 @@ class PlanController extends Controller
 
             // 2. Hybrid Preference Logic: "AND between groups, OR within the group"
 
-            // Group 1: Dietary Preferences
             $dietPrefs = array_filter((array) $user->dietary_preferences);
             if (! empty($dietPrefs)) {
                 $query->where(function (Builder $q) use ($dietPrefs) {
@@ -103,7 +105,6 @@ class PlanController extends Controller
                 });
             }
 
-            // Group 2: Fitness Goals
             $fitnessPrefs = array_filter((array) $user->fitness_goals);
             if (! empty($fitnessPrefs)) {
                 $query->where(function (Builder $q) use ($fitnessPrefs) {
@@ -113,7 +114,6 @@ class PlanController extends Controller
                 });
             }
 
-            // Group 3: Logistics Preferences
             $logisticsPrefs = array_filter((array) $user->logistics_preferences);
             if (! empty($logisticsPrefs)) {
                 $query->where(function (Builder $q) use ($logisticsPrefs) {
@@ -123,17 +123,35 @@ class PlanController extends Controller
                 });
             }
 
+            // NEW: Group 4 - Allergies (STRICT BLACKLIST)
+            $allergies = array_filter((array) $user->allergies);
+            if (! empty($allergies)) {
+                foreach ($allergies as $allergy) {
+                    // Exclude any recipe where the categories array contains the allergen tag
+                    $query->whereJsonDoesntContain('categories', $allergy);
+                }
+            }
+
             $availableRecipes = $query->get();
 
             // Fallback: If strict preferences + 30-day rule yields nothing, drop the 30-day rule
             if ($availableRecipes->isEmpty()) {
-                $availableRecipes = Recipe::with('ingredients')->get();
+                $fallbackQuery = Recipe::with('ingredients');
+                
+                // CRITICAL FIX: We drop nice-to-have preferences, but we MUST keep the allergy blacklist!
+                if (! empty($allergies)) {
+                    foreach ($allergies as $allergy) {
+                        $fallbackQuery->whereJsonDoesntContain('categories', $allergy);
+                    }
+                }
+                
+                $availableRecipes = $fallbackQuery->get();
             }
 
             if ($availableRecipes->isEmpty()) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Not enough available recipes in the database.',
+                    'message' => 'Not enough available recipes matching your strict dietary requirements.',
                 ], 400);
             }
 
@@ -141,7 +159,6 @@ class PlanController extends Controller
             $seedRecipe = $availableRecipes->random();
             $selectedRecipes = collect([$seedRecipe]);
 
-            // Check user preference, default to true if null
             $shouldMinimizeWaste = $user->minimize_food_waste ?? true;
 
             // 4. Find overlapping ingredients to minimize food waste
@@ -179,7 +196,6 @@ class PlanController extends Controller
             // 6. Save the generated plan to the database using a transaction
             DB::beginTransaction();
 
-            // Clear any upcoming generated meals
             MealPlan::where('user_id', $userId)
                 ->where('scheduled_for', '>=', Carbon::today())
                 ->delete();
@@ -190,14 +206,11 @@ class PlanController extends Controller
             foreach ($selectedRecipes as $index => $recipe) {
                 $scheduledDate = $startDate->copy()->addDays($index);
 
-                // Portions automatically set to cover the household
-                $portions = 3;
-
                 MealPlan::create([
                     'user_id' => $userId,
                     'recipe_slug' => $recipe->slug,
                     'scheduled_for' => $scheduledDate->format('Y-m-d'),
-                    'portions' => $portions,
+                    'portions' => $defaultPortions, // FIX: Dynamically applied from user preferences
                 ]);
 
                 $planResponse[] = [
@@ -208,7 +221,6 @@ class PlanController extends Controller
 
             DB::commit();
 
-            // NEW: Invalidate the user's cached plan so they immediately see this new one
             Cache::forget("meal_plan_user_{$userId}");
 
             return response()->json([

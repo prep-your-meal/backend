@@ -49,11 +49,11 @@ class WebhookController extends Controller
                 'message' => 'Successfully synced '.count($parsedRecipes).' recipes and master ingredients to the database.',
             ]);
 
-            // NEU: Throwable fängt ALLES ab, auch fatale PHP 8 TypeErrors
+            // NEW: Throwable catches EVERYTHING, including fatal PHP 8 TypeErrors
         } catch (\Throwable $e) {
             Log::error('GitHub Sync Error: '.$e->getMessage());
 
-            // Sicheres Parsen des Status-Codes (Datenbank-Fehler haben oft Strings wie '42S22' als Code)
+            // Safely parse the status code (database errors often have string codes like '42S22')
             $code = $e->getCode();
             $statusCode = (is_numeric($code) && $code >= 400 && $code < 600) ? (int) $code : 500;
 
@@ -61,7 +61,7 @@ class WebhookController extends Controller
                 'status' => 'error',
                 'message' => 'Failed to sync recipes.',
                 'error' => $e->getMessage(),
-                'file' => $e->getFile(), // Hilft uns beim Debuggen
+                'file' => $e->getFile(), // Helps with debugging
                 'line' => $e->getLine(),
             ], $statusCode);
         }
@@ -209,12 +209,12 @@ class WebhookController extends Controller
                     if (! isset($groupedRecipes[$canonicalSlug])) {
                         $groupedRecipes[$canonicalSlug] = $yamlData;
                         $groupedRecipes[$canonicalSlug]['title'] = [];
-                        $groupedRecipes[$canonicalSlug]['instructions'] = []; // NEU: Array für Zubereitung vorbereiten
+                        $groupedRecipes[$canonicalSlug]['instructions'] = []; // NEW: Prepare array for instructions
                     }
 
                     $groupedRecipes[$canonicalSlug]['title'][$lang] = $yamlData['title'];
 
-                    // NEU: Den Markdown-Body (alles unter dem YAML) auslesen und speichern
+                    // NEW: Read and store the markdown body (everything below the YAML front matter)
                     $groupedRecipes[$canonicalSlug]['instructions'][$lang] = trim($document->body());
                 }
             }
@@ -236,7 +236,7 @@ class WebhookController extends Controller
                     ['slug' => $yamlData['slug']],
                     [
                         'title' => $yamlData['title'],
-                        'instructions' => $yamlData['instructions'] ?? null, // NEU: Zubereitung speichern
+                        'instructions' => $yamlData['instructions'] ?? null, // NEW: Store instructions
                         'image' => $yamlData['image'] ?? null,
                         'prep_time' => $yamlData['prep_time'] ?? null,
                         'cook_time' => $yamlData['cook_time'] ?? null,
@@ -277,8 +277,7 @@ class WebhookController extends Controller
 
                 $recipe->ingredients()->sync($syncData);
 
-                // NEU: Cache-Busting! Den alten Cache für dieses spezifische Rezept löschen,
-                // damit die API die frischen Daten ausliefert.
+                // NEW: Cache-Busting! Clear the old cache for this specific recipe to serve fresh data.
                 Cache::forget("recipe_{$recipe->slug}");
             }
 

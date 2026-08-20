@@ -1,12 +1,12 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\FavoriteController;
 use App\Http\Controllers\Api\PlanController;
 use App\Http\Controllers\Api\RecipeController;
 use App\Http\Controllers\Api\ShoppingListController;
 use App\Http\Controllers\Api\UserPreferenceController;
 use App\Http\Controllers\Api\WebhookController;
-use App\Http\Controllers\Api\FavoriteController;
 use Illuminate\Support\Facades\Route;
 
 // Auth & Socialite

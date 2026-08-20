@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Laravel\Sanctum\Sanctum; // <-- IMPORTANT: Import Sanctum
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class UserPreferenceTest extends TestCase
@@ -18,7 +18,6 @@ class UserPreferenceTest extends TestCase
     {
         $response = $this->getJson('/user/preferences');
 
-        // Temporary debug output to see what is hiding behind the 404 error
         if ($response->status() !== 401) {
             $response->dump();
         }
@@ -45,14 +44,18 @@ class UserPreferenceTest extends TestCase
                 'status',
                 'data' => [
                     'target_meals_per_week',
+                    'default_portions',      // <-- NEW
                     'dietary_preferences',
                     'fitness_goals',
                     'logistics_preferences',
-                    'minimize_food_waste', // <-- NEU
+                    'allergies',             // <-- NEW
+                    'minimize_food_waste', 
                 ],
             ])
             ->assertJsonPath('data.target_meals_per_week', 3)
+            ->assertJsonPath('data.default_portions', 2) // <-- Default value from database
             ->assertJsonPath('data.dietary_preferences', [])
+            ->assertJsonPath('data.allergies', [])       // <-- Default empty array
             ->assertJsonPath('data.minimize_food_waste', true);
     }
 
@@ -67,10 +70,12 @@ class UserPreferenceTest extends TestCase
 
         $payload = [
             'target_meals_per_week' => 5,
+            'default_portions' => 4,
             'dietary_preferences' => ['vegan', 'low-carb'],
             'fitness_goals' => ['high-protein'],
-            'logistics_preferences' => ['meal-prep-friendly'],
-            'minimize_food_waste' => false, // <-- NEU
+            'logistics_preferences' => ['family-friendly'],
+            'allergies' => ['nuts', 'soy'],
+            'minimize_food_waste' => false, 
         ];
 
         $response = $this->putJson('/user/preferences', $payload);
@@ -78,17 +83,20 @@ class UserPreferenceTest extends TestCase
         $response->assertStatus(200)
             ->assertJsonPath('status', 'success')
             ->assertJsonPath('data.target_meals_per_week', 5)
-            ->assertJsonPath('data.minimize_food_waste', false); // <-- NEU
+            ->assertJsonPath('data.default_portions', 4)
+            ->assertJsonPath('data.minimize_food_waste', false); 
 
         // Verify database was actually updated
         $this->assertDatabaseHas('users', [
             'id' => $user->id,
             'target_meals_per_week' => 5,
+            'default_portions' => 4,
             'minimize_food_waste' => 0,
         ]);
 
         $user->refresh();
         $this->assertEquals(['vegan', 'low-carb'], $user->dietary_preferences);
+        $this->assertEquals(['nuts', 'soy'], $user->allergies);
     }
 
     /**
@@ -102,8 +110,10 @@ class UserPreferenceTest extends TestCase
 
         $payload = [
             'target_meals_per_week' => 4,
-            'dietary_preferences' => ['carnivore'], // Not in ALLOWED_DIETS
-            'fitness_goals' => ['super-strong'],    // Not in ALLOWED_FITNESS
+            'default_portions' => 2,
+            'dietary_preferences' => ['carnivore'], 
+            'fitness_goals' => ['super-strong'],
+            'allergies' => ['dust'],
             'minimize_food_waste' => 'yes-please',
         ];
 
@@ -111,6 +121,6 @@ class UserPreferenceTest extends TestCase
 
         $response->assertStatus(422)
                  // Tell Laravel to look for the validation errors inside the 'data' key instead of 'errors'
-            ->assertJsonValidationErrors(['dietary_preferences.0', 'fitness_goals.0', 'minimize_food_waste'], 'data'); // <-- NEU
+            ->assertJsonValidationErrors(['dietary_preferences.0', 'fitness_goals.0', 'allergies.0', 'minimize_food_waste'], 'data');
     }
 }

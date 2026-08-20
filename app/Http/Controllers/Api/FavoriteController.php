@@ -20,7 +20,7 @@ class FavoriteController extends Controller
         // Fetch the current user's favorite recipes, paginated for the PWA frontend
         $favorites = $request->user()->favoriteRecipes()->paginate(15);
 
-        // Optional: Apply the same multi-language localization logic for the title 
+        // Optional: Apply the same multi-language localization logic for the title
         // here as seen in the RecipeController, if required.
 
         return response()->json([
@@ -30,7 +30,7 @@ class FavoriteController extends Controller
                 'current_page' => $favorites->currentPage(),
                 'last_page' => $favorites->lastPage(),
                 'total' => $favorites->total(),
-            ]
+            ],
         ]);
     }
 
@@ -42,7 +42,7 @@ class FavoriteController extends Controller
     )]
     public function toggle(string $slug, Request $request)
     {
-        if (!Recipe::where('slug', $slug)->exists()) {
+        if (! Recipe::where('slug', $slug)->exists()) {
             return response()->json(['status' => 'error', 'message' => 'Recipe not found.'], 404);
         }
 
@@ -51,7 +51,7 @@ class FavoriteController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Favorite status updated.'
+            'message' => 'Favorite status updated.',
         ]);
     }
 }

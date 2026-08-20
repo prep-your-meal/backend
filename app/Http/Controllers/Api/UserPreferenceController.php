@@ -17,7 +17,9 @@ class UserPreferenceController extends Controller
 
     private const ALLOWED_FITNESS = ['high-protein', 'bulking', 'cutting', 'balanced'];
 
-    private const ALLOWED_LOGISTICS = ['meal-prep-friendly', 'quick', 'one-pot'];
+    private const ALLOWED_LOGISTICS = ['meal-prep-friendly', 'quick', 'one-pot', 'family-friendly']; 
+
+    private const ALLOWED_ALLERGIES = ['nuts', 'shellfish', 'soy', 'eggs', 'lactose', 'gluten'];
 
     #[OA\Get(
         path: '/user/preferences',
@@ -37,6 +39,7 @@ class UserPreferenceController extends Controller
                     type: 'object',
                     properties: [
                         new OA\Property(property: 'target_meals_per_week', type: 'integer', example: 3),
+                        new OA\Property(property: 'default_portions', type: 'integer', example: 2),
                         new OA\Property(
                             property: 'dietary_preferences',
                             type: 'array',
@@ -53,9 +56,11 @@ class UserPreferenceController extends Controller
                             items: new OA\Items(type: 'string', example: 'meal-prep-friendly')
                         ),
                         new OA\Property(
-                            property: 'minimize_food_waste',
-                            type: 'boolean'
+                            property: 'allergies',
+                            type: 'array',
+                            items: new OA\Items(type: 'string', example: 'nuts')
                         ),
+                        new OA\Property(property: 'minimize_food_waste', type: 'boolean'),
                     ]
                 ),
             ]
@@ -70,9 +75,11 @@ class UserPreferenceController extends Controller
             'status' => 'success',
             'data' => [
                 'target_meals_per_week' => $user->target_meals_per_week,
+                'default_portions' => $user->default_portions ?? 2, // Default-Wert für neue User
                 'dietary_preferences' => $user->dietary_preferences ?? [],
                 'fitness_goals' => $user->fitness_goals ?? [],
                 'logistics_preferences' => $user->logistics_preferences ?? [],
+                'allergies' => $user->allergies ?? [],
                 'minimize_food_waste' => (bool) ($user->minimize_food_waste ?? true),
             ],
         ]);
@@ -88,9 +95,10 @@ class UserPreferenceController extends Controller
     #[OA\RequestBody(
         required: true,
         content: new OA\JsonContent(
-            required: ['target_meals_per_week'],
+            required: ['target_meals_per_week', 'default_portions'],
             properties: [
                 new OA\Property(property: 'target_meals_per_week', type: 'integer', example: 4),
+                new OA\Property(property: 'default_portions', type: 'integer', example: 2),
                 new OA\Property(
                     property: 'dietary_preferences',
                     type: 'array',
@@ -107,9 +115,11 @@ class UserPreferenceController extends Controller
                     items: new OA\Items(type: 'string', example: 'meal-prep-friendly')
                 ),
                 new OA\Property(
-                    property: 'minimize_food_waste',
-                    type: 'boolean'
+                    property: 'allergies',
+                    type: 'array',
+                    items: new OA\Items(type: 'string', example: 'nuts')
                 ),
+                new OA\Property(property: 'minimize_food_waste', type: 'boolean'),
             ]
         )
     )]
@@ -118,9 +128,9 @@ class UserPreferenceController extends Controller
     #[OA\Response(response: 401, description: 'Unauthenticated')]
     public function update(Request $request): JsonResponse
     {
-        // Validate the incoming JSON payload against our allowed sets
         $validated = $request->validate([
             'target_meals_per_week' => ['required', 'integer', 'min:1', 'max:21'],
+            'default_portions' => ['required', 'integer', 'min:1', 'max:10'],
 
             'dietary_preferences' => ['nullable', 'array'],
             'dietary_preferences.*' => ['string', Rule::in(self::ALLOWED_DIETS)],
@@ -130,12 +140,14 @@ class UserPreferenceController extends Controller
 
             'logistics_preferences' => ['nullable', 'array'],
             'logistics_preferences.*' => ['string', Rule::in(self::ALLOWED_LOGISTICS)],
+            
+            'allergies' => ['nullable', 'array'],
+            'allergies.*' => ['string', Rule::in(self::ALLOWED_ALLERGIES)],
+
             'minimize_food_waste' => ['nullable', 'boolean'],
         ]);
 
         $user = $request->user();
-
-        // Update the user record with the validated data
         $user->update($validated);
 
         return response()->json([
@@ -143,9 +155,11 @@ class UserPreferenceController extends Controller
             'message' => 'User preferences updated successfully.',
             'data' => [
                 'target_meals_per_week' => $user->target_meals_per_week,
+                'default_portions' => $user->default_portions,
                 'dietary_preferences' => $user->dietary_preferences,
                 'fitness_goals' => $user->fitness_goals,
                 'logistics_preferences' => $user->logistics_preferences,
+                'allergies' => $user->allergies,
                 'minimize_food_waste' => (bool) ($user->minimize_food_waste ?? true),
             ],
         ]);

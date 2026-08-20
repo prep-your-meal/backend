@@ -47,7 +47,7 @@ class Recipe extends Model
 
     public function favoritedBy()
     {
-        return $this->belongsToMany(\App\Models\User::class, 'recipe_user', 'recipe_slug', 'user_id')
-                    ->withTimestamps();
+        return $this->belongsToMany(User::class, 'recipe_user', 'recipe_slug', 'user_id')
+            ->withTimestamps();
     }
 }

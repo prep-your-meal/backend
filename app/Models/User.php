@@ -15,12 +15,14 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'provider',     // Für Social Login
-        'provider_id',  // Für Social Login
+        'provider',
+        'provider_id',
         'target_meals_per_week',
+        'default_portions',
         'dietary_preferences',
         'fitness_goals',
         'logistics_preferences',
+        'allergies',
         'minimize_food_waste',
     ];
 
@@ -34,10 +36,11 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
-            // Cast JSON columns to PHP arrays automatically
             'dietary_preferences' => 'array',
             'fitness_goals' => 'array',
             'logistics_preferences' => 'array',
+            'allergies' => 'array',
+            'default_portions' => 'integer',
             'minimize_food_waste' => 'boolean',
         ];
     }
@@ -45,7 +48,7 @@ class User extends Authenticatable
     public function favoriteRecipes()
     {
         // Since we are not using the default ID convention, we must specify the custom keys explicitly
-        return $this->belongsToMany(\App\Models\Recipe::class, 'recipe_user', 'user_id', 'recipe_slug')
-                    ->withTimestamps();
+        return $this->belongsToMany(Recipe::class, 'recipe_user', 'user_id', 'recipe_slug')
+            ->withTimestamps();
     }
 }

@@ -34,24 +34,27 @@ class PlanApiTest extends TestCase
             ]);
     }
 
-    public function test_generate_plan_fails_if_not_enough_recipes()
+    public function test_generate_plan_fails_if_not_enough_recipes_matching_requirements()
     {
         $user = User::factory()->create();
         Sanctum::actingAs($user, ['*']);
 
         $response = $this->postJson('/plan/generate');
 
-        // Updated error message to match the new controller logic
+        // Updated error message to match the new strict allergy fallback logic
         $response->assertStatus(400)
             ->assertJson([
                 'status' => 'error',
-                'message' => 'Not enough available recipes in the database.',
+                'message' => 'Not enough available recipes matching your strict dietary requirements.',
             ]);
     }
 
-    public function test_successfully_generates_meal_plan_with_default_portions()
+    public function test_successfully_generates_meal_plan_with_dynamic_default_portions()
     {
-        $user = User::factory()->create();
+        // Explicitly set default portions to prove the hardcoded value is gone
+        $user = User::factory()->create([
+            'default_portions' => 4,
+        ]);
         Sanctum::actingAs($user, ['*']);
 
         // Create 7 dummy recipes to satisfy the default 7-day requirement
@@ -68,10 +71,10 @@ class PlanApiTest extends TestCase
         // Verify database contains exactly 7 meal plans
         $this->assertDatabaseCount('meal_plans', 7);
 
-        // Verify that the portions are automatically set to 3 for the family
+        // Verify that the portions are dynamically set based on user preferences (4)
         $this->assertDatabaseHas('meal_plans', [
             'user_id' => $user->id,
-            'portions' => 3,
+            'portions' => 4,
         ]);
     }
 
@@ -156,6 +159,51 @@ class PlanApiTest extends TestCase
         $this->assertDatabaseMissing('meal_plans', [
             'user_id' => $user->id,
             'recipe_slug' => 'vegan-slow-meal',
+        ]);
+    }
+
+    public function test_allergy_blacklist_is_strictly_enforced()
+    {
+        $user = User::factory()->create([
+            'target_meals_per_week' => 2,
+            'allergies' => ['nuts', 'shellfish'],
+        ]);
+        Sanctum::actingAs($user, ['*']);
+
+        // Safe recipes
+        Recipe::factory()->create([
+            'slug' => 'safe-recipe-1',
+            'categories' => ['vegan', 'quick'],
+        ]);
+        Recipe::factory()->create([
+            'slug' => 'safe-recipe-2',
+            'categories' => ['high-protein'],
+        ]);
+
+        // Dangerous recipes containing allergens
+        Recipe::factory()->create([
+            'slug' => 'dangerous-nut-recipe',
+            'categories' => ['nuts', 'dessert'],
+        ]);
+        Recipe::factory()->create([
+            'slug' => 'dangerous-shellfish-recipe',
+            'categories' => ['shellfish', 'dinner'],
+        ]);
+
+        $response = $this->postJson('/plan/generate');
+
+        $response->assertStatus(200);
+
+        // Ensure only the two safe recipes were selected
+        $this->assertDatabaseCount('meal_plans', 2);
+        
+        $this->assertDatabaseMissing('meal_plans', [
+            'user_id' => $user->id,
+            'recipe_slug' => 'dangerous-nut-recipe',
+        ]);
+        $this->assertDatabaseMissing('meal_plans', [
+            'user_id' => $user->id,
+            'recipe_slug' => 'dangerous-shellfish-recipe',
         ]);
     }
 

@@ -10,18 +10,18 @@ return new class extends Migration
     {
         Schema::create('recipe_user', function (Blueprint $table) {
             $table->id();
-            
+
             // Foreign key to the user
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            
+
             // Foreign key to the recipe (Note: referencing the string 'slug' instead of an ID)
             $table->string('recipe_slug');
             $table->foreign('recipe_slug')->references('slug')->on('recipes')->cascadeOnDelete();
-            
+
             $table->timestamps();
 
             // Prevent a user from favoriting the exact same recipe multiple times
-            $table->unique(['user_id', 'recipe_slug']); 
+            $table->unique(['user_id', 'recipe_slug']);
         });
     }
 

@@ -22,7 +22,7 @@ class FavoriteControllerTest extends TestCase
     public function test_user_can_add_a_favorite_recipe()
     {
         $user = User::factory()->create();
-        
+
         $recipe = Recipe::forceCreate([
             'slug' => 'test-recipe',
             'title' => ['en' => 'Test Recipe'],
@@ -32,10 +32,10 @@ class FavoriteControllerTest extends TestCase
 
         // Request 1: Toggle ON
         $response = $this->actingAs($user, 'sanctum')->postJson("/favorites/{$recipe->slug}/toggle");
-        
+
         $response->assertStatus(200)
             ->assertJson(['status' => 'success']);
-            
+
         $this->assertDatabaseHas('recipe_user', [
             'user_id' => $user->id,
             'recipe_slug' => $recipe->slug,
@@ -45,7 +45,7 @@ class FavoriteControllerTest extends TestCase
     public function test_user_can_remove_a_favorite_recipe()
     {
         $user = User::factory()->create();
-        
+
         $recipe = Recipe::forceCreate([
             'slug' => 'test-recipe',
             'title' => ['en' => 'Test Recipe'],
@@ -58,10 +58,10 @@ class FavoriteControllerTest extends TestCase
 
         // Request 2: Toggle OFF
         $response = $this->actingAs($user, 'sanctum')->postJson("/favorites/{$recipe->slug}/toggle");
-        
+
         $response->assertStatus(200)
             ->assertJson(['status' => 'success']);
-            
+
         $this->assertDatabaseMissing('recipe_user', [
             'user_id' => $user->id,
             'recipe_slug' => $recipe->slug,
@@ -102,9 +102,9 @@ class FavoriteControllerTest extends TestCase
             ->assertJsonStructure([
                 'status',
                 'data' => [
-                    '*' => ['slug', 'title'] 
+                    '*' => ['slug', 'title'],
                 ],
-                'meta' => ['current_page', 'last_page', 'total'] 
+                'meta' => ['current_page', 'last_page', 'total'],
             ]);
 
         $this->assertCount(1, $response->json('data'));

@@ -16,7 +16,7 @@ class WebhookControllerTest extends TestCase
     {
         parent::setUp();
 
-        // Alle benötigten Config-Werte für den WebhookController setzen
+        // Set all required config values for the WebhookController
         config([
             'services.github.sync_secret' => 'test-secret-key',
             'services.github.repo' => 'test/repo',
@@ -56,6 +56,7 @@ chicken_breast:
   category: "meat"
 ');
 
+            // NEW: Added "nuts" to categories to verify allergy tagging syncs correctly
             $zip->addFromString('repo-main/recipes/en/chicken-curry.md', '---
 title: "Chicken Curry"
 image: "recipes/images/chicken-curry.webp"
@@ -65,6 +66,7 @@ default_portions: 2
 categories:
   - "dinner"
   - "high-protein"
+  - "nuts"
 nutrition_per_portion:
   calories: 550
   protein_g: 45
@@ -103,18 +105,23 @@ ingredients:
             'name' => 'Chicken breast',
         ]);
 
-        // Prüfe Basis-Daten (ohne JSON Felder, um SQLite Kompatibilität zu wahren)
+        // Verify base data (without JSON fields to maintain SQLite compatibility)
         $this->assertDatabaseHas('recipes', [
             'slug' => 'chicken-curry',
             'calories' => 550,
             'protein_g' => 45,
         ]);
 
-        // JSON-Felder sicher über das Model abfragen
+        // Safely assert JSON fields via the Eloquent model
         $recipe = Recipe::where('slug', 'chicken-curry')->first();
         $this->assertNotNull($recipe);
         $this->assertEquals('Chicken Curry', $recipe->title['en']);
         $this->assertStringContainsString('Cook the chicken.', $recipe->instructions['en']);
+        
+        // Assert that the categories were successfully extracted and stored (including the allergy tag)
+        $this->assertIsArray($recipe->categories);
+        $this->assertContains('high-protein', $recipe->categories);
+        $this->assertContains('nuts', $recipe->categories);
 
         $this->assertCount(1, $recipe->ingredients);
         $pivotIngredient = $recipe->ingredients->first();
