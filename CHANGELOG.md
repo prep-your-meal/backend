@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.8.0](https://github.com/prep-your-meal/backend/compare/v1.7.0...v1.8.0) (2026-08-20)
+
+
+### Features
+
+* **api:** implement password reset, asset syncing, and security hardening ([a5186fe](https://github.com/prep-your-meal/backend/commit/a5186fec2c0471e81131dbc35ad4d3576472839c))
+
+
+### Bug Fixes
+
+* **api:** prevent loss of custom items on empty meal plan and fix variable output ([0427683](https://github.com/prep-your-meal/backend/commit/04276839af04199ff7ac7686c00c6a7790eeabfc))
+
 ## [1.7.0](https://github.com/prep-your-meal/backend/compare/v1.6.0...v1.7.0) (2026-08-20)
 
 
