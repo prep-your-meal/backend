@@ -16,6 +16,14 @@ Route::get('/auth/{provider}/callback', [AuthController::class, 'handleProviderC
 // GitHub Webhook
 Route::post('/webhooks/github', [WebhookController::class, 'handle']);
 
+// Recipes
+// List all recipes with pagination and filtering (max 60 requests per minute)
+Route::get('/recipes', [RecipeController::class, 'index'])
+    ->middleware(['throttle:60,1']);
+// Limit to 30 requests per minute per user/IP to prevent flooding and scraping
+Route::get('/recipes/{slug}', [RecipeController::class, 'show'])
+    ->middleware('throttle:30,1');
+
 /*
 |--------------------------------------------------------------------------
 | Shared hosting environment FIX: Swagger UI Assets & Documentation
@@ -119,11 +127,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // User Preferences (Wizard)
     Route::get('/user/preferences', [UserPreferenceController::class, 'show'])->name('user.preferences.show');
     Route::put('/user/preferences', [UserPreferenceController::class, 'update'])->name('user.preferences.update');
-
-    // Recipes
-    // Limit to 30 requests per minute per user/IP to prevent flooding and scraping
-    Route::get('/recipes/{slug}', [RecipeController::class, 'show'])
-        ->middleware('throttle:30,1');
 
     // Shopping List
     Route::get('/shopping-list', [ShoppingListController::class, 'index']);

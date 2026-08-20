@@ -4,9 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Ingredient;
 use App\Models\Recipe;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class RecipeApiTest extends TestCase
@@ -15,8 +13,6 @@ class RecipeApiTest extends TestCase
 
     public function test_user_can_retrieve_single_recipe()
     {
-        $user = User::factory()->create();
-        Sanctum::actingAs($user, ['*']);
 
         // Create a recipe with ingredients to test eager loading
         $recipe = Recipe::factory()
@@ -40,8 +36,6 @@ class RecipeApiTest extends TestCase
 
     public function test_returns_404_for_invalid_recipe()
     {
-        $user = User::factory()->create();
-        Sanctum::actingAs($user, ['*']);
 
         $response = $this->getJson('/recipes/invalid-slug');
 
@@ -50,8 +44,6 @@ class RecipeApiTest extends TestCase
 
     public function test_can_retrieve_paginated_list_of_recipes()
     {
-        $user = User::factory()->create();
-        Sanctum::actingAs($user, ['*']);
 
         // Create 20 recipes
         Recipe::factory()->count(20)->create();
@@ -67,8 +59,6 @@ class RecipeApiTest extends TestCase
 
     public function test_can_filter_recipes_by_category()
     {
-        $user = User::factory()->create();
-        Sanctum::actingAs($user, ['*']);
 
         // Create specific recipes to test the JSON column filtering
         Recipe::factory()->count(3)->create([
@@ -88,8 +78,6 @@ class RecipeApiTest extends TestCase
 
     public function test_can_search_recipes_by_title()
     {
-        $user = User::factory()->create();
-        Sanctum::actingAs($user, ['*']);
 
         // Create specific recipes to test the text search using the correct 'title' column
         Recipe::factory()->create(['title' => 'Spicy Chicken Curry']);
