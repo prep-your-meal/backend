@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.6.0](https://github.com/prep-your-meal/backend/compare/v1.5.4...v1.6.0) (2026-08-20)
+
+
+### Features
+
+* **api:** add multi-language instructions and fix webhook parser ([2086375](https://github.com/prep-your-meal/backend/commit/208637520935e1bda21abaee89a2f67c749b54f0))
+* **api:** add recipe endpoint for single retrieval ([4d99422](https://github.com/prep-your-meal/backend/commit/4d994222b800f0f3da2cc328b5de5009964e1398))
+* **api:** add title search functionality to recipe list ([beae439](https://github.com/prep-your-meal/backend/commit/beae439fdea0a0cd40feaaafddec52c9b5c6901a))
+* **api:** add user recipe favorites feature ([7cee347](https://github.com/prep-your-meal/backend/commit/7cee347bda87aa5df5f62316c685aa8370e5dbd3))
+* **api:** finalize PWA backend with meal swapping, meta taxonomy, and account management ([0e8ed62](https://github.com/prep-your-meal/backend/commit/0e8ed626d5ecc3450f4c245b5c3e3d00f073f1f4))
+* **api:** make recipe endpoints publicly accessible ([37db6ed](https://github.com/prep-your-meal/backend/commit/37db6ed8735c2ef2a2b4e85b9e8aa69d797c04f7))
+
 ## [1.5.4](https://github.com/prep-your-meal/backend/compare/v1.5.3...v1.5.4) (2026-08-19)
 
 
