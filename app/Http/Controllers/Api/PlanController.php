@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use OpenApi\Attributes as OA;
@@ -28,11 +29,15 @@ class PlanController extends Controller
             $today = Carbon::today();
             $userId = $request->user()->id;
 
-            $currentPlan = MealPlan::with(['recipe.ingredients'])
-                ->where('user_id', $userId)
-                ->where('scheduled_for', '>=', $today)
-                ->orderBy('scheduled_for', 'asc')
-                ->get();
+            // NEW: Wrap the existing Eloquent query inside a Cache::remember block.
+            // TTL is set to the end of the current week.
+            $currentPlan = Cache::remember("meal_plan_user_{$userId}", now()->endOfWeek(), function () use ($userId, $today) {
+                return MealPlan::with(['recipe.ingredients'])
+                    ->where('user_id', $userId)
+                    ->where('scheduled_for', '>=', $today)
+                    ->orderBy('scheduled_for', 'asc')
+                    ->get();
+            });
 
             if ($currentPlan->isEmpty()) {
                 return response()->json([
@@ -202,6 +207,9 @@ class PlanController extends Controller
             }
 
             DB::commit();
+
+            // NEW: Invalidate the user's cached plan so they immediately see this new one
+            Cache::forget("meal_plan_user_{$userId}");
 
             return response()->json([
                 'status' => 'success',

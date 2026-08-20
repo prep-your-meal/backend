@@ -113,7 +113,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Meal Plan
     Route::get('/plan', [PlanController::class, 'current']);
     // Limit plan generation to 5 requests per minute per user/IP
-    Route::post('/meal-plans/generate', [PlanController::class, 'generate'])
+    Route::post('/plan/generate', [PlanController::class, 'generate'])
         ->middleware(['auth:sanctum', 'throttle:5,1']);
 
     // User Preferences (Wizard)
