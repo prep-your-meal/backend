@@ -13,6 +13,7 @@ class MetaController extends Controller
         summary: 'Get all available preference categories',
         tags: ['System']
     )]
+    #[OA\Response(response: 200, description: 'List of available categories')]
     public function categories(): JsonResponse
     {
         return response()->json([

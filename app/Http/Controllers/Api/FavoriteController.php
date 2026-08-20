@@ -15,6 +15,7 @@ class FavoriteController extends Controller
         security: [['bearerAuth' => []]],
         tags: ['Favorites']
     )]
+    #[OA\Response(response: 200, description: 'List of favorite recipes')]
     public function index(Request $request)
     {
         // Fetch the current user's favorite recipes, paginated for the PWA frontend
@@ -40,6 +41,8 @@ class FavoriteController extends Controller
         security: [['bearerAuth' => []]],
         tags: ['Favorites']
     )]
+    #[OA\Response(response: 200, description: 'Favorite toggled successfully')]
+    #[OA\Response(response: 404, description: 'Recipe not found')]
     public function toggle(string $slug, Request $request)
     {
         if (! Recipe::where('slug', $slug)->exists()) {

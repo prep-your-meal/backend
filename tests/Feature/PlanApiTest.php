@@ -300,4 +300,65 @@ class PlanApiTest extends TestCase
                 'message' => 'No meal scheduled for this date.',
             ]);
     }
+
+    public function test_user_can_manually_add_a_meal_to_a_specific_date()
+    {
+        $user = User::factory()->create([
+            'default_portions' => 3,
+        ]);
+        Sanctum::actingAs($user, ['*']);
+
+        $recipe = Recipe::factory()->create(['slug' => 'my-favorite-curry']);
+        $date = Carbon::today()->format('Y-m-d');
+
+        $response = $this->postJson("/plan/{$date}/add", [
+            'recipe_slug' => $recipe->slug,
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'status' => 'success',
+                'message' => 'Meal successfully scheduled.',
+            ]);
+
+        // Verify it was saved with the user's default portions
+        $this->assertDatabaseHas('meal_plans', [
+            'user_id' => $user->id,
+            'scheduled_for' => $date,
+            'recipe_slug' => $recipe->slug,
+            'portions' => 3,
+        ]);
+    }
+
+    public function test_user_can_clear_a_meal_for_a_specific_date()
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user, ['*']);
+
+        $date = Carbon::today()->format('Y-m-d');
+        $recipe = Recipe::factory()->create();
+
+        // Create an existing meal plan
+        MealPlan::create([
+            'user_id' => $user->id,
+            'recipe_slug' => $recipe->slug,
+            'scheduled_for' => $date,
+            'portions' => 2,
+        ]);
+
+        // Attempt to clear it
+        $response = $this->deleteJson("/plan/{$date}");
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'status' => 'success',
+                'message' => 'Meal removed from the plan for this date.',
+            ]);
+
+        // Ensure it's gone from the DB
+        $this->assertDatabaseMissing('meal_plans', [
+            'user_id' => $user->id,
+            'scheduled_for' => $date,
+        ]);
+    }
 }

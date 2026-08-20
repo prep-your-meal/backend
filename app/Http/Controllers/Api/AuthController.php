@@ -58,11 +58,70 @@ class AuthController extends Controller
     }
 
     #[OA\Post(
+        path: '/auth/register',
+        summary: 'Register a new user',
+        tags: ['Auth']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['name', 'email', 'password', 'password_confirmation'],
+            properties: [
+                new OA\Property(property: 'name', type: 'string', example: 'John Doe'),
+                new OA\Property(property: 'email', type: 'string', format: 'email', example: 'john@example.com'),
+                new OA\Property(property: 'password', type: 'string', format: 'password', example: 'secret123'),
+                new OA\Property(property: 'password_confirmation', type: 'string', format: 'password', example: 'secret123'),
+            ]
+        )
+    )]
+    #[OA\Response(response: 201, description: 'User registered successfully')]
+    #[OA\Response(response: 422, description: 'Validation errors')]
+    public function register(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $user = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
+        ]);
+
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'User registered successfully.',
+            'token' => $token,
+            'user' => $user,
+        ], 201);
+    }
+
+    #[OA\Get(
+        path: '/user',
+        summary: 'Get the authenticated user details',
+        security: [['bearerAuth' => []]],
+        tags: ['User']
+    )]
+    #[OA\Response(response: 200, description: 'Authenticated user data')]
+    public function me(Request $request): JsonResponse
+    {
+        return response()->json([
+            'status' => 'success',
+            'data' => $request->user(),
+        ]);
+    }
+
+    #[OA\Post(
         path: '/auth/logout',
         summary: 'Logout user and revoke current token',
         security: [['bearerAuth' => []]],
         tags: ['Auth']
     )]
+    #[OA\Response(response: 200, description: 'Successfully logged out')]
     public function logout(Request $request): JsonResponse
     {
         // Revokes the token that was used to authenticate the current request
@@ -80,6 +139,7 @@ class AuthController extends Controller
         security: [['bearerAuth' => []]],
         tags: ['User']
     )]
+    #[OA\Response(response: 200, description: 'Account permanently deleted')]
     public function destroy(Request $request): JsonResponse
     {
         $user = $request->user();

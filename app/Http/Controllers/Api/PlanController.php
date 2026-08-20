@@ -183,6 +183,9 @@ class PlanController extends Controller
         security: [['bearerAuth' => []]],
         tags: ['Meal Plan']
     )]
+    #[OA\Response(response: 200, description: 'Meal successfully swapped')]
+    #[OA\Response(response: 400, description: 'No alternative recipes available')]
+    #[OA\Response(response: 404, description: 'No meal scheduled for this date')]
     public function swap(Request $request, string $date): JsonResponse
     {
         $user = $request->user();
@@ -226,6 +229,71 @@ class PlanController extends Controller
             'status' => 'success',
             'message' => 'Meal successfully swapped.',
             'data' => $mealPlan->load('recipe.ingredients'),
+        ]);
+    }
+
+    #[OA\Post(
+        path: '/plan/{date}/add',
+        summary: 'Manually add a specific recipe to a date',
+        security: [['bearerAuth' => []]],
+        tags: ['Meal Plan']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['recipe_slug'],
+            properties: [
+                new OA\Property(property: 'recipe_slug', type: 'string', example: 'chicken-curry'),
+            ]
+        )
+    )]
+    #[OA\Response(response: 200, description: 'Recipe manually added to plan')]
+    public function addManual(Request $request, string $date): JsonResponse
+    {
+        $request->validate([
+            'recipe_slug' => ['required', 'string', 'exists:recipes,slug'],
+        ]);
+
+        $user = $request->user();
+        $defaultPortions = $user->default_portions ?? 2;
+
+        // Use updateOrCreate so if a meal already exists for this date, it gets overwritten
+        $mealPlan = MealPlan::updateOrCreate(
+            ['user_id' => $user->id, 'scheduled_for' => $date],
+            ['recipe_slug' => $request->recipe_slug, 'portions' => $defaultPortions]
+        );
+
+        Cache::forget("meal_plan_user_{$user->id}");
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Meal successfully scheduled.',
+            'data' => $mealPlan->load('recipe.ingredients'),
+        ]);
+    }
+
+    #[OA\Delete(
+        path: '/plan/{date}',
+        summary: 'Clear the meal scheduled for a specific date',
+        security: [['bearerAuth' => []]],
+        tags: ['Meal Plan']
+    )]
+    #[OA\Response(response: 200, description: 'Meal removed from plan')]
+    public function clearDate(Request $request, string $date): JsonResponse
+    {
+        $user = $request->user();
+
+        $deleted = MealPlan::where('user_id', $user->id)
+            ->where('scheduled_for', $date)
+            ->delete();
+
+        if ($deleted) {
+            Cache::forget("meal_plan_user_{$user->id}");
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Meal removed from the plan for this date.',
         ]);
     }
 

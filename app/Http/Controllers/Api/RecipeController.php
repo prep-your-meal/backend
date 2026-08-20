@@ -17,7 +17,7 @@ class RecipeController extends Controller
         description: 'Retrieves a paginated list of recipes. Supports filtering by category and searching by title. Automatically localized based on Accept-Language header.',
         tags: ['Recipes']
     )]
-    // ... (Deine bestehenden Swagger-Parameter für category und search bleiben hier)
+    #[OA\Response(response: 200, description: 'List of recipes')]
     public function index(Request $request): JsonResponse
     {
         // 1. Determine the best language match (defaults to the first array item 'en' if no match)
@@ -73,6 +73,8 @@ class RecipeController extends Controller
         description: 'The canonical slug of the recipe (filename without extension)',
         schema: new OA\Schema(type: 'string')
     )]
+    #[OA\Response(response: 200, description: 'Recipe details')]
+    #[OA\Response(response: 404, description: 'Recipe not found')]
     public function show(string $slug, Request $request): JsonResponse
     {
         // 1. Determine the preferred language

@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Route;
 // --- Public Routes ---
 
 // Auth & Socialite
+Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/login', [AuthController::class, 'login'])->name('login');
 Route::get('/auth/{provider}/redirect', [AuthController::class, 'redirectToProvider']);
 Route::get('/auth/{provider}/callback', [AuthController::class, 'handleProviderCallback']);
@@ -99,7 +100,7 @@ Route::get('/', function () {
             'name' => config('app.name'),
             'environment' => config('app.env'),
             'status' => 'running',
-            'documentation' => route('l5-swagger.default.docs'),
+            'documentation' => route('l5-swagger.default.api'),
             'version' => defined('API_VERSION') ? API_VERSION : '1.0.0', // Safe fallback if constant is missing
         ],
     ]);
@@ -109,6 +110,7 @@ Route::get('/', function () {
 Route::middleware('auth:sanctum')->group(function () {
 
     // Auth & User Profile
+    Route::get('/user', [AuthController::class, 'me']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::delete('/user', [AuthController::class, 'destroy']);
 
@@ -118,6 +120,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/plan/generate', [PlanController::class, 'generate'])
         ->middleware('throttle:5,1');
     Route::put('/plan/{date}/swap', [PlanController::class, 'swap']);
+    Route::post('/plan/{date}/add', [PlanController::class, 'addManual']); // <--- NEU
+    Route::delete('/plan/{date}', [PlanController::class, 'clearDate']);
 
     // User Preferences (Wizard)
     Route::get('/user/preferences', [UserPreferenceController::class, 'show'])->name('user.preferences.show');
