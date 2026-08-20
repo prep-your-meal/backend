@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\PlanController;
+use App\Http\Controllers\Api\RecipeController;
 use App\Http\Controllers\Api\ShoppingListController;
 use App\Http\Controllers\Api\UserPreferenceController;
 use App\Http\Controllers\Api\WebhookController;
@@ -116,6 +117,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // User Preferences (Wizard)
     Route::get('/user/preferences', [UserPreferenceController::class, 'show'])->name('user.preferences.show');
     Route::put('/user/preferences', [UserPreferenceController::class, 'update'])->name('user.preferences.update');
+
+    // Recipes
+    // Limit to 30 requests per minute per user/IP to prevent flooding and scraping
+    Route::get('/recipes/{slug}', [RecipeController::class, 'show'])
+        ->middleware('throttle:30,1');
 
     // Shopping List
     Route::get('/shopping-list', [ShoppingListController::class, 'index']);
