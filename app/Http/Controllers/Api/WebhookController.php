@@ -96,7 +96,20 @@ class WebhookController extends Controller
         $zipPath = storage_path('app/temp_repo.zip');
         $tempExtractPath = storage_path('app/temp_extracted');
 
-        $response = Http::withToken($token)->get($url);
+        Log::info('GitHub Sync Debug', [
+            'repo' => $repo,
+            'branch' => $branch,
+            'token_length' => strlen($token),
+            'token_start' => substr($token, 0, 10),
+        ]);
+
+        $response = Http::withToken($token)
+            ->withHeaders([
+                'User-Agent' => 'PrepYourMeal-Webhook-App',
+                'Accept' => 'application/vnd.github+json',
+                'X-GitHub-Api-Version' => '2022-11-28',
+            ])
+            ->get($url);
 
         if ($response->failed()) {
             throw new \Exception('Failed to download repository. HTTP Status: '.$response->status());
