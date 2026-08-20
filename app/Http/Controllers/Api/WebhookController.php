@@ -11,7 +11,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 use OpenApi\Attributes as OA;
 use Spatie\YamlFrontMatter\YamlFrontMatter;
 use Symfony\Component\Yaml\Yaml;
@@ -39,21 +38,26 @@ class WebhookController extends Controller
             $this->verifyRecipeSyncSecret($request);
             $storageBasePath = storage_path('app');
 
+            // 1. Download & extract repo
             $this->downloadAndExtractRepo($storageBasePath);
-            $ingredientLookup = $this->syncMasterIngredients($storageBasePath.'/ingredients.yaml');
+
+            // 2. Sync ingredients (Master Registry)
+            $this->syncMasterIngredients($storageBasePath.'/ingredients.yaml');
+
+            // 3. Parse recipe bundles
             $parsedRecipes = $this->parseRecipesFromDirectory($storageBasePath);
-            $this->syncRecipesToDatabase($parsedRecipes, $ingredientLookup);
+
+            // 4. Sync recipes to DB
+            $this->syncRecipesToDatabase($parsedRecipes);
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Successfully synced '.count($parsedRecipes).' recipes and master ingredients to the database.',
+                'message' => 'Successfully synced '.count($parsedRecipes).' recipe bundles and master ingredients to the database.',
             ]);
 
-            // Throwable catches EVERYTHING, including fatal PHP 8 TypeErrors
         } catch (\Throwable $e) {
             Log::error('GitHub Sync Error: '.$e->getMessage());
 
-            // Safely parse the status code (database errors often have string codes like '42S22')
             $code = $e->getCode();
             $statusCode = (is_numeric($code) && $code >= 400 && $code < 600) ? (int) $code : 500;
 
@@ -61,15 +65,12 @@ class WebhookController extends Controller
                 'status' => 'error',
                 'message' => 'Failed to sync recipes.',
                 'error' => $e->getMessage(),
-                'file' => $e->getFile(), // Helps with debugging
+                'file' => $e->getFile(),
                 'line' => $e->getLine(),
             ], $statusCode);
         }
     }
 
-    /**
-     * Verify the custom sync token sent by the GitHub Action.
-     */
     private function verifyRecipeSyncSecret(Request $request): void
     {
         $secret = config('services.github.sync_secret');
@@ -85,9 +86,6 @@ class WebhookController extends Controller
         }
     }
 
-    /**
-     * Download the repository ZIP archive from GitHub and extract required files.
-     */
     private function downloadAndExtractRepo(string $destinationPath): void
     {
         $repo = trim(config('services.github.repo'));
@@ -123,27 +121,31 @@ class WebhookController extends Controller
                     File::copy($ingredientsSource, $destinationPath.'/ingredients.yaml');
                 }
 
-                // 2. NEW: Copy categories.yaml (Schema Contract)
+                // 2. Copy categories.yaml (Schema Contract)
                 $categoriesSource = $repoRoot.'/categories.yaml';
                 if (File::exists($categoriesSource)) {
                     File::copy($categoriesSource, $destinationPath.'/categories.yaml');
-                    // Bust the cache so the MetaController serves the fresh categories instantly!
                     Cache::forget('pym_categories_schema');
                 }
 
-                // 3. Copy markdown recipes
+                // 3. Copy markdown recipes (Bundles)
                 $recipesSource = $repoRoot.'/recipes';
                 if (File::exists($recipesSource)) {
                     File::ensureDirectoryExists($destinationPath.'/recipes');
                     File::copyDirectory($recipesSource, $destinationPath.'/recipes');
-                }
 
-                // 4. Copy images directly to the public folder
-                $imagesSource = $repoRoot.'/recipes/images';
-                if (File::exists($imagesSource)) {
+                    // 4. Extract images from bundles and move them to public folder
                     $publicImagesPath = public_path('recipes/images');
                     File::ensureDirectoryExists($publicImagesPath);
-                    File::copyDirectory($imagesSource, $publicImagesPath);
+
+                    $bundles = File::directories($recipesSource);
+                    foreach ($bundles as $bundle) {
+                        $slug = basename($bundle);
+                        $imageSource = $bundle.'/image.webp';
+                        if (File::exists($imageSource)) {
+                            File::copy($imageSource, $publicImagesPath.'/'.$slug.'.webp');
+                        }
+                    }
                 }
             }
 
@@ -154,146 +156,125 @@ class WebhookController extends Controller
         }
     }
 
-    /**
-     * Parse master ingredients from ingredients.yaml and build a lookup map.
-     */
-    private function syncMasterIngredients(string $yamlPath): array
+    private function syncMasterIngredients(string $yamlPath): void
     {
-        $ingredientLookup = [];
-
         if (! File::exists($yamlPath)) {
             Log::warning("ingredients.yaml not found at: {$yamlPath}");
 
-            return $ingredientLookup;
+            return;
         }
 
         $yamlContent = Yaml::parseFile($yamlPath);
 
         if (! is_array($yamlContent)) {
-            return $ingredientLookup;
+            return;
         }
 
-        foreach ($yamlContent as $key => $data) {
-            // Update or create the master ingredient using the YAML key as the unique slug
-            $ingredient = Ingredient::updateOrCreate(
-                ['slug' => $key],
+        foreach ($yamlContent as $slug => $data) {
+            Ingredient::updateOrCreate(
+                ['slug' => $slug],
                 [
-                    'name' => $data['en'] ?? ($data['de'] ?? $key),
+                    // Adjust this based on whether your 'name' column uses Spatie Translatable or is a simple string
+                    'name' => $data['en'] ?? ($data['de'] ?? $slug),
                     'unit' => $data['unit'] ?? '',
                     'category' => $data['category'] ?? 'misc',
                 ]
             );
-
-            // Build lookup references for both German and English names to match recipe entries
-            if (! empty($data['de'])) {
-                $ingredientLookup[mb_strtolower(trim($data['de']))] = $ingredient;
-            }
-            if (! empty($data['en'])) {
-                $ingredientLookup[mb_strtolower(trim($data['en']))] = $ingredient;
-            }
-            $ingredientLookup[mb_strtolower($key)] = $ingredient;
         }
-
-        return $ingredientLookup;
     }
 
-    /**
-     * Parse Markdown recipe files and group them by filename (canonical slug)
-     * to support multiple languages seamlessly.
-     */
     private function parseRecipesFromDirectory(string $basePath): array
     {
-        $groupedRecipes = [];
-        $languages = ['de', 'en'];
+        $parsedRecipes = [];
+        $recipesDir = $basePath.'/recipes/recipes'; // Adjusted for storage/app/recipes/recipes
 
-        foreach ($languages as $lang) {
-            $langDir = $basePath.'/recipes/'.$lang;
+        if (! File::exists($recipesDir)) {
+            return $parsedRecipes;
+        }
 
-            if (! File::exists($langDir)) {
+        $bundles = File::directories($recipesDir);
+
+        foreach ($bundles as $bundle) {
+            $slug = basename($bundle);
+            $metaPath = $bundle.'/meta.yaml';
+            $dePath = $bundle.'/de.md';
+            $enPath = $bundle.'/en.md';
+
+            // Skip incomplete bundles
+            if (! File::exists($metaPath) || ! File::exists($dePath) || ! File::exists($enPath)) {
+                Log::warning("Incomplete bundle skipped: {$slug}");
+
                 continue;
             }
 
-            $files = File::files($langDir);
+            $meta = Yaml::parseFile($metaPath);
+            $deDoc = YamlFrontMatter::parseFile($dePath);
+            $enDoc = YamlFrontMatter::parseFile($enPath);
 
-            foreach ($files as $file) {
-                if ($file->getExtension() === 'md') {
-                    $document = YamlFrontMatter::parseFile($file->getPathname());
-                    $yamlData = $document->matter();
-
-                    $canonicalSlug = $file->getBasename('.md');
-                    $yamlData['slug'] = $canonicalSlug;
-
-                    if (! isset($groupedRecipes[$canonicalSlug])) {
-                        $groupedRecipes[$canonicalSlug] = $yamlData;
-                        $groupedRecipes[$canonicalSlug]['title'] = [];
-                        $groupedRecipes[$canonicalSlug]['instructions'] = [];
-                    }
-
-                    $groupedRecipes[$canonicalSlug]['title'][$lang] = $yamlData['title'];
-
-                    $groupedRecipes[$canonicalSlug]['instructions'][$lang] = trim($document->body());
-                }
-            }
+            $parsedRecipes[$slug] = [
+                'slug' => $slug,
+                'title' => [
+                    'de' => $deDoc->matter('title', $slug),
+                    'en' => $enDoc->matter('title', $slug),
+                ],
+                'instructions' => [
+                    'de' => trim($deDoc->body()),
+                    'en' => trim($enDoc->body()),
+                ],
+                'prep_time' => $meta['prep_time'] ?? 15,
+                'cook_time' => $meta['cook_time'] ?? 20,
+                'default_portions' => $meta['default_portions'] ?? 2,
+                'categories' => $meta['categories'] ?? [],
+                'ingredients' => $meta['ingredients'] ?? [],
+                'image' => "recipes/images/{$slug}.webp",
+                'nutrition_per_portion' => $meta['nutrition_per_portion'] ?? [],
+            ];
         }
 
-        return $groupedRecipes;
+        return $parsedRecipes;
     }
 
-    /**
-     * Takes the parsed YAML data and syncs recipes and their ingredient relationships with the database.
-     */
-    private function syncRecipesToDatabase(array $parsedRecipes, array $ingredientLookup): void
+    private function syncRecipesToDatabase(array $parsedRecipes): void
     {
         DB::beginTransaction();
 
         try {
-            foreach ($parsedRecipes as $yamlData) {
+            foreach ($parsedRecipes as $data) {
                 $recipe = Recipe::updateOrCreate(
-                    ['slug' => $yamlData['slug']],
+                    ['slug' => $data['slug']],
                     [
-                        'title' => $yamlData['title'],
-                        'instructions' => $yamlData['instructions'] ?? null,
-                        'image' => $yamlData['image'] ?? null,
-                        'prep_time' => $yamlData['prep_time'] ?? null,
-                        'cook_time' => $yamlData['cook_time'] ?? null,
-                        'default_portions' => $yamlData['default_portions'] ?? 1,
-                        'categories' => $yamlData['categories'] ?? null,
-
-                        // Extract macros safely using data_get (prevents undefined array key crashes)
-                        'calories' => data_get($yamlData, 'nutrition_per_portion.calories', 0),
-                        'protein_g' => data_get($yamlData, 'nutrition_per_portion.protein_g', 0),
-                        'carbs_g' => data_get($yamlData, 'nutrition_per_portion.carbs_g', 0),
-                        'fat_g' => data_get($yamlData, 'nutrition_per_portion.fat_g', 0),
+                        'title' => $data['title'],
+                        'instructions' => $data['instructions'],
+                        'image' => $data['image'],
+                        'prep_time' => $data['prep_time'],
+                        'cook_time' => $data['cook_time'],
+                        'default_portions' => $data['default_portions'],
+                        'categories' => $data['categories'],
+                        'calories' => data_get($data, 'nutrition_per_portion.calories', 0),
+                        'protein_g' => data_get($data, 'nutrition_per_portion.protein_g', 0),
+                        'carbs_g' => data_get($data, 'nutrition_per_portion.carbs_g', 0),
+                        'fat_g' => data_get($data, 'nutrition_per_portion.fat_g', 0),
                     ]
                 );
 
                 $syncData = [];
 
-                if (isset($yamlData['ingredients']) && is_array($yamlData['ingredients'])) {
-                    foreach ($yamlData['ingredients'] as $ingData) {
-                        $ingredientNameLower = mb_strtolower(trim($ingData['name']));
+                if (is_array($data['ingredients'])) {
+                    foreach ($data['ingredients'] as $ingData) {
+                        $slug = $ingData['slug'];
 
-                        if (isset($ingredientLookup[$ingredientNameLower])) {
-                            $masterIngredient = $ingredientLookup[$ingredientNameLower];
-                            $syncData[$masterIngredient->slug] = ['amount' => $ingData['amount']];
+                        // We check if the ingredient exists, as the GitHub Action guarantees it should
+                        $ingredient = Ingredient::where('slug', $slug)->first();
+
+                        if ($ingredient) {
+                            $syncData[$ingredient->slug] = ['amount' => $ingData['amount']];
                         } else {
-                            $fallbackSlug = Str::slug($ingData['name']);
-                            $newIngredient = Ingredient::updateOrCreate(
-                                ['slug' => $fallbackSlug],
-                                [
-                                    'name' => $ingData['name'],
-                                    'unit' => $ingData['unit'] ?? '',
-                                    'category' => $ingData['category'] ?? 'misc',
-                                ]
-                            );
-                            $syncData[$fallbackSlug] = ['amount' => $ingData['amount']];
+                            Log::warning("Ingredient slug '{$slug}' not found in database for recipe '{$data['slug']}'.");
                         }
                     }
                 }
 
                 $recipe->ingredients()->sync($syncData);
-
-                // Cache-Busting! Clear the old cache for this specific recipe to serve fresh data.
                 Cache::forget("recipe_{$recipe->slug}");
             }
 

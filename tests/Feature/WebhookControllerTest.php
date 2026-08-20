@@ -42,12 +42,14 @@ class WebhookControllerTest extends TestCase
             ->assertJson(['status' => 'error']);
     }
 
-    public function test_it_successfully_syncs_recipes_ingredients_and_images_from_github()
+    public function test_it_successfully_syncs_recipes_ingredients_and_images_from_github_bundles()
     {
         $tempZipPath = tempnam(sys_get_temp_dir(), 'repo').'.zip';
         $zip = new ZipArchive;
 
         if ($zip->open($tempZipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) === true) {
+
+            // 1. Master Registry
             $zip->addFromString('repo-main/ingredients.yaml', '
 chicken_breast:
   en: "Chicken breast"
@@ -55,37 +57,48 @@ chicken_breast:
   unit: "g"
   category: "meat"
 ');
-            // NEU: Simuliere die categories.yaml im GitHub Repo
+
+            // 2. Schema Contract
             $zip->addFromString('repo-main/categories.yaml', '
 meal_types:
-  - breakfast
+  - dinner
 ');
 
-            $zip->addFromString('repo-main/recipes/en/chicken-curry.md', '---
-title: "Chicken Curry"
-image: "recipes/images/chicken-curry.webp"
+            // 3. RECIPE BUNDLE: chicken-curry
+            $zip->addFromString('repo-main/recipes/chicken-curry/meta.yaml', '
 prep_time: 15
 cook_time: 25
 default_portions: 2
 categories:
   - "dinner"
-  - "high-protein"
-  - "nuts"
 nutrition_per_portion:
   calories: 550
   protein_g: 45
   carbs_g: 20
   fat_g: 22
 ingredients:
-  - name: "Chicken breast"
+  - slug: "chicken_breast"
     amount: 400
-    unit: "g"
+');
+
+            $zip->addFromString('repo-main/recipes/chicken-curry/de.md', '---
+title: "Hähnchen Curry"
+---
+
+## Zubereitung
+1. Hähnchen kochen.
+');
+
+            $zip->addFromString('repo-main/recipes/chicken-curry/en.md', '---
+title: "Chicken Curry"
 ---
 
 ## Preparation
 1. Cook the chicken.
 ');
-            $zip->addFromString('repo-main/recipes/images/chicken-curry.webp', 'fake-image-content');
+
+            // Image placed directly inside the bundle
+            $zip->addFromString('repo-main/recipes/chicken-curry/image.webp', 'fake-image-content');
 
             $zip->close();
         }
@@ -106,19 +119,22 @@ ingredients:
                 'status' => 'success',
             ]);
 
+        // Assert Ingredient exists
         $this->assertDatabaseHas('ingredients', [
             'slug' => 'chicken_breast',
         ]);
 
+        // Assert Recipe exists
         $this->assertDatabaseHas('recipes', [
             'slug' => 'chicken-curry',
+            'prep_time' => 15,
         ]);
 
-        // Prüfe ob die Bilder kopiert wurden
+        // Prüfe ob die Bilder korrekt aus dem Bundle in den Public-Ordner kopiert wurden
         $publicImagePath = public_path('recipes/images/chicken-curry.webp');
         $this->assertTrue(File::exists($publicImagePath));
 
-        // NEU: Prüfe ob die categories.yaml korrekt ins Storage entpackt wurde
+        // Prüfe ob die categories.yaml korrekt ins Storage entpackt wurde
         $categoriesPath = storage_path('app/recipes/categories.yaml');
         $this->assertTrue(File::exists($categoriesPath));
 
