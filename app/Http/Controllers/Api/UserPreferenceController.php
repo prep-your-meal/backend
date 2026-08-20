@@ -11,17 +11,6 @@ use OpenApi\Attributes as OA;
 
 class UserPreferenceController extends Controller
 {
-    /**
-     * Allowed categories based on the defined backend sets.
-     */
-    public const ALLOWED_DIETS = ['vegan', 'vegetarian', 'keto', 'low-carb', 'gluten-free', 'dairy-free'];
-
-    public const ALLOWED_FITNESS = ['high-protein', 'bulking', 'cutting', 'balanced'];
-
-    public const ALLOWED_LOGISTICS = ['meal-prep-friendly', 'quick', 'one-pot', 'family-friendly'];
-
-    public const ALLOWED_ALLERGIES = ['nuts', 'shellfish', 'soy', 'eggs', 'lactose', 'gluten'];
-
     #[OA\Get(
         path: '/user/preferences',
         summary: 'Retrieve user preferences',
@@ -76,7 +65,7 @@ class UserPreferenceController extends Controller
             'status' => 'success',
             'data' => [
                 'target_meals_per_week' => $user->target_meals_per_week,
-                'default_portions' => $user->default_portions ?? 2, // Default-Wert für neue User
+                'default_portions' => $user->default_portions ?? 2, // Default value for new users
                 'dietary_preferences' => $user->dietary_preferences ?? [],
                 'fitness_goals' => $user->fitness_goals ?? [],
                 'logistics_preferences' => $user->logistics_preferences ?? [],
@@ -129,21 +118,25 @@ class UserPreferenceController extends Controller
     #[OA\Response(response: 401, description: 'Unauthenticated')]
     public function update(Request $request): JsonResponse
     {
+        // 1. Dynamically fetch the current rule set (Schema Contract)
+        $schema = MetaController::getCategoriesSchema();
+
+        // 2. Validate against the dynamic arrays from the YAML file
         $validated = $request->validate([
             'target_meals_per_week' => ['required', 'integer', 'min:1', 'max:21'],
             'default_portions' => ['required', 'integer', 'min:1', 'max:10'],
 
             'dietary_preferences' => ['nullable', 'array'],
-            'dietary_preferences.*' => ['string', Rule::in(self::ALLOWED_DIETS)],
+            'dietary_preferences.*' => ['string', Rule::in($schema['diets'] ?? [])],
 
             'fitness_goals' => ['nullable', 'array'],
-            'fitness_goals.*' => ['string', Rule::in(self::ALLOWED_FITNESS)],
+            'fitness_goals.*' => ['string', Rule::in($schema['fitness_profiles'] ?? [])],
 
             'logistics_preferences' => ['nullable', 'array'],
-            'logistics_preferences.*' => ['string', Rule::in(self::ALLOWED_LOGISTICS)],
+            'logistics_preferences.*' => ['string', Rule::in($schema['logistics'] ?? [])],
 
             'allergies' => ['nullable', 'array'],
-            'allergies.*' => ['string', Rule::in(self::ALLOWED_ALLERGIES)],
+            'allergies.*' => ['string', Rule::in($schema['allergies'] ?? [])],
 
             'minimize_food_waste' => ['nullable', 'boolean'],
         ]);

@@ -16,8 +16,9 @@ class MetaControllerTest extends TestCase
             ->assertJsonStructure([
                 'status',
                 'data' => [
+                    'meal_types',       // <-- NEW
                     'diets',
-                    'fitness',
+                    'fitness_profiles', // <-- RENAMED
                     'logistics',
                     'allergies',
                 ],
@@ -26,7 +27,7 @@ class MetaControllerTest extends TestCase
         // Check if our specific arrays are returned correctly
         $data = $response->json('data');
         $this->assertContains('vegan', $data['diets']);
-        $this->assertContains('high-protein', $data['fitness']);
+        $this->assertContains('high-protein', $data['fitness_profiles']); // <-- RENAMED
         $this->assertContains('family-friendly', $data['logistics']);
         $this->assertContains('nuts', $data['allergies']);
     }

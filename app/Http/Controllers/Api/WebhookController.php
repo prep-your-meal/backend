@@ -115,21 +115,30 @@ class WebhookController extends Controller
 
             if (! empty($directories)) {
                 $repoRoot = $directories[0];
+                $destinationPath = storage_path('app/recipes');
 
                 // 1. Copy ingredients.yaml
-                $yamlSource = $repoRoot.'/ingredients.yaml';
-                if (File::exists($yamlSource)) {
-                    File::copy($yamlSource, $destinationPath.'/ingredients.yaml');
+                $ingredientsSource = $repoRoot.'/ingredients.yaml';
+                if (File::exists($ingredientsSource)) {
+                    File::copy($ingredientsSource, $destinationPath.'/ingredients.yaml');
                 }
 
-                // 2. Copy markdown recipes
+                // 2. NEW: Copy categories.yaml (Schema Contract)
+                $categoriesSource = $repoRoot.'/categories.yaml';
+                if (File::exists($categoriesSource)) {
+                    File::copy($categoriesSource, $destinationPath.'/categories.yaml');
+                    // Bust the cache so the MetaController serves the fresh categories instantly!
+                    Cache::forget('pym_categories_schema');
+                }
+
+                // 3. Copy markdown recipes
                 $recipesSource = $repoRoot.'/recipes';
                 if (File::exists($recipesSource)) {
                     File::ensureDirectoryExists($destinationPath.'/recipes');
                     File::copyDirectory($recipesSource, $destinationPath.'/recipes');
                 }
 
-                // 3. Copy images directly to the public folder
+                // 4. Copy images directly to the public folder
                 $imagesSource = $repoRoot.'/recipes/images';
                 if (File::exists($imagesSource)) {
                     $publicImagesPath = public_path('recipes/images');

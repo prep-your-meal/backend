@@ -55,6 +55,11 @@ chicken_breast:
   unit: "g"
   category: "meat"
 ');
+            // NEU: Simuliere die categories.yaml im GitHub Repo
+            $zip->addFromString('repo-main/categories.yaml', '
+meal_types:
+  - breakfast
+');
 
             $zip->addFromString('repo-main/recipes/en/chicken-curry.md', '---
 title: "Chicken Curry"
@@ -109,9 +114,16 @@ ingredients:
             'slug' => 'chicken-curry',
         ]);
 
+        // Prüfe ob die Bilder kopiert wurden
         $publicImagePath = public_path('recipes/images/chicken-curry.webp');
         $this->assertTrue(File::exists($publicImagePath));
 
+        // NEU: Prüfe ob die categories.yaml korrekt ins Storage entpackt wurde
+        $categoriesPath = storage_path('app/recipes/categories.yaml');
+        $this->assertTrue(File::exists($categoriesPath));
+
+        // Aufräumen
         File::deleteDirectory(public_path('recipes/images'));
+        File::delete($categoriesPath);
     }
 }
