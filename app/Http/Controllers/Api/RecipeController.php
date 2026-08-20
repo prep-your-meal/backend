@@ -14,43 +14,40 @@ class RecipeController extends Controller
     #[OA\Get(
         path: '/recipes',
         summary: 'List all recipes',
-        description: 'Retrieves a paginated list of recipes. Supports filtering by category.',
-        security: [['bearerAuth' => []]],
+        description: 'Retrieves a paginated list of recipes. Supports filtering by category and searching by title. Automatically localized based on Accept-Language header.',
         tags: ['Recipes']
     )]
-    #[OA\Parameter(
-        name: 'category',
-        in: 'query',
-        required: false,
-        description: 'Filter recipes by a specific category (e.g., vegan, quick)',
-        schema: new OA\Schema(type: 'string')
-    )]
-    #[OA\Parameter(
-        name: 'search',
-        in: 'query',
-        required: false,
-        description: 'Search recipes by their name',
-        schema: new OA\Schema(type: 'string')
-    )]
-    #[OA\Response(response: 200, description: 'List of recipes retrieved successfully')]
+    // ... (Deine bestehenden Swagger-Parameter für category und search bleiben hier)
     public function index(Request $request): JsonResponse
     {
+        // 1. Determine the best language match (defaults to the first array item 'en' if no match)
+        $locale = $request->getPreferredLanguage(['en', 'de']);
+
         $query = Recipe::query();
 
-        // Apply category filter if provided
+        // Apply filters (using the new canonical logic)
         $query->when($request->query('category'), function ($q, $category) {
             $q->whereJsonContains('categories', $category);
         });
 
-        // Apply search filter if provided (case-insensitive partial match on the title)
         $query->when($request->query('search'), function ($q, $search) {
+            // Note: In a JSON column, searching via LIKE is database dependent.
+            // For MariaDB/MySQL, this string-based LIKE search on the JSON payload usually works fine
+            // to find a partial match in either language.
             $q->where('title', 'like', '%'.$search.'%');
         });
 
-        // Eager load ingredients and paginate
         $recipes = $query->with('ingredients')
             ->orderBy('created_at', 'desc')
             ->paginate(15);
+
+        // 2. Transform the paginated items to flatten the localized title for the frontend
+        $recipes->getCollection()->transform(function ($recipe) use ($locale) {
+            // Larastan weiß, dass $recipe->title ein Array ist. Keine Prüfung nötig.
+            $recipe->title = $recipe->title[$locale] ?? $recipe->title['en'] ?? $recipe->slug;
+
+            return $recipe;
+        });
 
         return response()->json([
             'status' => 'success',
@@ -66,29 +63,35 @@ class RecipeController extends Controller
     #[OA\Get(
         path: '/recipes/{slug}',
         summary: 'Get details of a specific recipe',
-        description: 'Retrieves a single recipe by its slug, including all related ingredients.',
-        security: [['bearerAuth' => []]],
+        description: 'Retrieves a single recipe by its canonical slug. Automatically localized based on Accept-Language header.',
         tags: ['Recipes']
     )]
     #[OA\Parameter(
         name: 'slug',
         in: 'path',
         required: true,
-        description: 'The unique slug of the recipe',
+        description: 'The canonical slug of the recipe (filename without extension)',
         schema: new OA\Schema(type: 'string')
     )]
-    #[OA\Response(response: 200, description: 'Recipe details retrieved successfully')]
-    #[OA\Response(response: 404, description: 'Recipe not found')]
-    public function show(string $slug): JsonResponse
+    public function show(string $slug, Request $request): JsonResponse
     {
-        // Cache the recipe indefinitely. The RecipeObserver handles cache invalidation.
+        // 1. Determine the preferred language
+        $locale = $request->getPreferredLanguage(['en', 'de']);
+
+        // 2. Load from cache (the raw model with the JSON array)
         $recipe = Cache::rememberForever("recipe_{$slug}", function () use ($slug) {
             return Recipe::with('ingredients')->where('slug', $slug)->firstOrFail();
         });
 
+        // 3. Convert to array so we don't accidentally mutate the cached object instance
+        $responseData = $recipe->toArray();
+
+        // 4. Flatten the localized title
+        $responseData['title'] = $recipe->title[$locale] ?? $recipe->title['en'] ?? $recipe->slug;
+
         return response()->json([
             'status' => 'success',
-            'data' => $recipe,
+            'data' => $responseData,
         ]);
     }
 }

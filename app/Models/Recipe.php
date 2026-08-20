@@ -24,6 +24,7 @@ class Recipe extends Model
         'prep_time',
         'cook_time',
         'default_portions',
+        'instructions',
         'categories',
         'calories',
         'protein_g',
@@ -34,8 +35,10 @@ class Recipe extends Model
 
     protected $casts = [
         'budget' => BudgetCategory::class,
+        'title' => 'array',
         'default_portions' => 'integer',
-        'categories' => 'array', // Automatically casts the JSON column to a PHP array
+        'categories' => 'array',
+        'instructions' => 'array',
     ];
 
     public function ingredients(): BelongsToMany

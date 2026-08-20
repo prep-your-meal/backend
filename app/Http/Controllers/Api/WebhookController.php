@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Ingredient;
 use App\Models\Recipe;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -35,21 +36,12 @@ class WebhookController extends Controller
     public function handle(Request $request)
     {
         try {
-            // 0. Verify the Recipe sync secret
             $this->verifyRecipeSyncSecret($request);
-
             $storageBasePath = storage_path('app');
 
-            // 1. Download and extract the repository (extracts recipes/ and ingredients.yaml)
             $this->downloadAndExtractRepo($storageBasePath);
-
-            // 2. Parse and sync the master ingredients registry from ingredients.yaml
             $ingredientLookup = $this->syncMasterIngredients($storageBasePath.'/ingredients.yaml');
-
-            // 3. Parse the Markdown files from both language directories (de and en)
             $parsedRecipes = $this->parseRecipesFromDirectory($storageBasePath);
-
-            // 4. Sync the parsed recipe YAML data and map ingredients via the master registry
             $this->syncRecipesToDatabase($parsedRecipes, $ingredientLookup);
 
             return response()->json([
@@ -57,15 +49,20 @@ class WebhookController extends Controller
                 'message' => 'Successfully synced '.count($parsedRecipes).' recipes and master ingredients to the database.',
             ]);
 
-        } catch (\Exception $e) {
+            // NEU: Throwable fängt ALLES ab, auch fatale PHP 8 TypeErrors
+        } catch (\Throwable $e) {
             Log::error('GitHub Sync Error: '.$e->getMessage());
 
-            $statusCode = $e->getCode() >= 400 && $e->getCode() < 600 ? $e->getCode() : 500;
+            // Sicheres Parsen des Status-Codes (Datenbank-Fehler haben oft Strings wie '42S22' als Code)
+            $code = $e->getCode();
+            $statusCode = (is_numeric($code) && $code >= 400 && $code < 600) ? (int) $code : 500;
 
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to sync recipes.',
                 'error' => $e->getMessage(),
+                'file' => $e->getFile(), // Hilft uns beim Debuggen
+                'line' => $e->getLine(),
             ], $statusCode);
         }
     }
@@ -184,11 +181,12 @@ class WebhookController extends Controller
     }
 
     /**
-     * Parse Markdown recipe files from the localized subdirectories (de and en).
+     * Parse Markdown recipe files and group them by filename (canonical slug)
+     * to support multiple languages seamlessly.
      */
     private function parseRecipesFromDirectory(string $basePath): array
     {
-        $parsedRecipes = [];
+        $groupedRecipes = [];
         $languages = ['de', 'en'];
 
         foreach ($languages as $lang) {
@@ -204,13 +202,25 @@ class WebhookController extends Controller
                 if ($file->getExtension() === 'md') {
                     $document = YamlFrontMatter::parseFile($file->getPathname());
                     $yamlData = $document->matter();
-                    $yamlData['language'] = $lang;
-                    $parsedRecipes[] = $yamlData;
+
+                    $canonicalSlug = $file->getBasename('.md');
+                    $yamlData['slug'] = $canonicalSlug;
+
+                    if (! isset($groupedRecipes[$canonicalSlug])) {
+                        $groupedRecipes[$canonicalSlug] = $yamlData;
+                        $groupedRecipes[$canonicalSlug]['title'] = [];
+                        $groupedRecipes[$canonicalSlug]['instructions'] = []; // NEU: Array für Zubereitung vorbereiten
+                    }
+
+                    $groupedRecipes[$canonicalSlug]['title'][$lang] = $yamlData['title'];
+
+                    // NEU: Den Markdown-Body (alles unter dem YAML) auslesen und speichern
+                    $groupedRecipes[$canonicalSlug]['instructions'][$lang] = trim($document->body());
                 }
             }
         }
 
-        return $parsedRecipes;
+        return $groupedRecipes;
     }
 
     /**
@@ -218,31 +228,29 @@ class WebhookController extends Controller
      */
     private function syncRecipesToDatabase(array $parsedRecipes, array $ingredientLookup): void
     {
-        // Use a database transaction to ensure atomicity across recipe and pivot records.
         DB::beginTransaction();
 
         try {
             foreach ($parsedRecipes as $yamlData) {
-                // 1. Update or Create the Recipe using the slug as the unique identifier.
                 $recipe = Recipe::updateOrCreate(
                     ['slug' => $yamlData['slug']],
                     [
                         'title' => $yamlData['title'],
+                        'instructions' => $yamlData['instructions'] ?? null, // NEU: Zubereitung speichern
                         'image' => $yamlData['image'] ?? null,
                         'prep_time' => $yamlData['prep_time'] ?? null,
                         'cook_time' => $yamlData['cook_time'] ?? null,
                         'default_portions' => $yamlData['default_portions'] ?? 1,
                         'categories' => $yamlData['categories'] ?? null,
 
-                        // Extract macros from the nested nutrition_per_portion array
-                        'calories' => $yamlData['nutrition_per_portion']['calories'] ?? 0,
-                        'protein_g' => $yamlData['nutrition_per_portion']['protein_g'] ?? 0,
-                        'carbs_g' => $yamlData['nutrition_per_portion']['carbs_g'] ?? 0,
-                        'fat_g' => $yamlData['nutrition_per_portion']['fat_g'] ?? 0,
+                        // Extract macros safely using data_get (prevents undefined array key crashes)
+                        'calories' => data_get($yamlData, 'nutrition_per_portion.calories', 0),
+                        'protein_g' => data_get($yamlData, 'nutrition_per_portion.protein_g', 0),
+                        'carbs_g' => data_get($yamlData, 'nutrition_per_portion.carbs_g', 0),
+                        'fat_g' => data_get($yamlData, 'nutrition_per_portion.fat_g', 0),
                     ]
                 );
 
-                // 2. Prepare syncing the ingredients pivot table using the master registry lookup map
                 $syncData = [];
 
                 if (isset($yamlData['ingredients']) && is_array($yamlData['ingredients'])) {
@@ -253,9 +261,8 @@ class WebhookController extends Controller
                             $masterIngredient = $ingredientLookup[$ingredientNameLower];
                             $syncData[$masterIngredient->slug] = ['amount' => $ingData['amount']];
                         } else {
-                            // Fallback in case an ingredient is missing from ingredients.yaml
-                            $fallbackSlug = Str::slug($sol = $ingData['name']);
-                            Ingredient::updateOrCreate(
+                            $fallbackSlug = Str::slug($ingData['name']);
+                            $newIngredient = Ingredient::updateOrCreate(
                                 ['slug' => $fallbackSlug],
                                 [
                                     'name' => $ingData['name'],
@@ -268,8 +275,11 @@ class WebhookController extends Controller
                     }
                 }
 
-                // 3. Sync the pivot table (ingredient_recipe)
                 $recipe->ingredients()->sync($syncData);
+
+                // NEU: Cache-Busting! Den alten Cache für dieses spezifische Rezept löschen,
+                // damit die API die frischen Daten ausliefert.
+                Cache::forget("recipe_{$recipe->slug}");
             }
 
             DB::commit();
