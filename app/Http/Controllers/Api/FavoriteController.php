@@ -16,14 +16,31 @@ class FavoriteController extends Controller
         security: [['bearerAuth' => []]],
         tags: ['Favorites']
     )]
+    #[OA\Parameter(
+        name: 'page',
+        in: 'query',
+        description: 'The page number to retrieve',
+        required: false,
+        schema: new OA\Schema(type: 'integer', default: 1)
+    )]
+    #[OA\Parameter(
+        name: 'per_page',
+        in: 'query',
+        description: 'Number of items per page',
+        required: false,
+        schema: new OA\Schema(type: 'integer', default: 15)
+    )]
     #[OA\Response(response: 200, description: 'List of favorite recipes')]
     public function index(Request $request)
     {
         // 1. Determine the best language match
         $locale = $request->getPreferredLanguage(['en', 'de']);
 
+        // Allow clients to define how many items to return, defaulting to 15
+        $perPage = $request->input('per_page', 15);
+
         // 2. Fetch the current user's favorite recipes with ingredients, paginated for the PWA frontend
-        $favorites = $request->user()->favoriteRecipes()->with('ingredients')->paginate(15);
+        $favorites = $request->user()->favoriteRecipes()->with('ingredients')->paginate($perPage);
 
         // 3. Transform the paginated items to flatten the localized title
         $favorites->getCollection()->transform(function ($recipe) use ($locale) {

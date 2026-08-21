@@ -18,11 +18,42 @@ class RecipeController extends Controller
         description: 'Retrieves a paginated list of recipes. Supports filtering by category and searching by title. Automatically localized based on Accept-Language header.',
         tags: ['Recipes']
     )]
+    #[OA\Parameter(
+        name: 'page',
+        in: 'query',
+        description: 'The page number to retrieve',
+        required: false,
+        schema: new OA\Schema(type: 'integer', default: 1)
+    )]
+    #[OA\Parameter(
+        name: 'per_page',
+        in: 'query',
+        description: 'Number of items per page',
+        required: false,
+        schema: new OA\Schema(type: 'integer', default: 15)
+    )]
+    #[OA\Parameter(
+        name: 'category',
+        in: 'query',
+        description: 'Filter recipes by a specific category',
+        required: false,
+        schema: new OA\Schema(type: 'string')
+    )]
+    #[OA\Parameter(
+        name: 'search',
+        in: 'query',
+        description: 'Search recipes by a title keyword',
+        required: false,
+        schema: new OA\Schema(type: 'string')
+    )]
     #[OA\Response(response: 200, description: 'List of recipes')]
     public function index(Request $request): JsonResponse
     {
         // 1. Determine the best language match (defaults to the first array item 'en' if no match)
         $locale = $request->getPreferredLanguage(['en', 'de']);
+
+        // Dynamic pagination parameter
+        $perPage = $request->input('per_page', 15);
 
         $query = Recipe::query();
 
@@ -40,7 +71,7 @@ class RecipeController extends Controller
 
         $recipes = $query->with('ingredients')
             ->orderBy('created_at', 'desc')
-            ->paginate(15);
+            ->paginate($perPage);
 
         // 2. Transform the paginated items to flatten the localized title for the frontend
         $recipes->getCollection()->transform(function ($recipe) use ($locale) {
