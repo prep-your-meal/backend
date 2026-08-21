@@ -161,6 +161,9 @@ jobs:
             fi
 
             # 5. Laravel Optimizations
+            echo "Clearing ALL old caches and compiled files..."
+            $PHP_BIN artisan optimize:clear
+
             echo "Caching configurations and routing..."
             $PHP_BIN artisan config:cache
             $PHP_BIN artisan route:cache
