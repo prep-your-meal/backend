@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.8.4](https://github.com/prep-your-meal/backend/compare/v1.8.3...v1.8.4) (2026-08-21)
+
+
+### Bug Fixes
+
+* **api:** correct path to ingredients.yaml in webhook sync ([66f470d](https://github.com/prep-your-meal/backend/commit/66f470df5e0db7cb64215795608137ec8ec64eea))
+
 ## [1.8.3](https://github.com/prep-your-meal/backend/compare/v1.8.2...v1.8.3) (2026-08-20)
 
 ## [1.8.2](https://github.com/prep-your-meal/backend/compare/v1.8.1...v1.8.2) (2026-08-20)
