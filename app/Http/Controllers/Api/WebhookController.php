@@ -42,7 +42,7 @@ class WebhookController extends Controller
             $this->downloadAndExtractRepo($storageBasePath);
 
             // 2. Sync ingredients (Master Registry)
-            $this->syncMasterIngredients($storageBasePath.'/ingredients.yaml');
+            $this->syncMasterIngredients($storageBasePath.'/recipes/ingredients.yaml');
 
             // 3. Parse recipe bundles
             $parsedRecipes = $this->parseRecipesFromDirectory($storageBasePath);
@@ -95,13 +95,6 @@ class WebhookController extends Controller
         $url = "https://api.github.com/repos/{$repo}/zipball/{$branch}";
         $zipPath = storage_path('app/temp_repo.zip');
         $tempExtractPath = storage_path('app/temp_extracted');
-
-        Log::info('GitHub Sync Debug', [
-            'repo' => $repo,
-            'branch' => $branch,
-            'token_length' => strlen($token),
-            'token_start' => substr($token, 0, 10),
-        ]);
 
         $response = Http::withToken($token)
             ->withHeaders([

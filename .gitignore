@@ -27,6 +27,7 @@ public/docs/
 !/storage/logs/.gitignore
 storage/api-docs/
 .phpunit.result.cache
+/public/recipes/
 
 # Docker / Sail
 docker-compose.override.yml
