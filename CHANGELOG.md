@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.9.0](https://github.com/prep-your-meal/backend/compare/v1.8.6...v1.9.0) (2026-08-21)
+
+
+### Features
+
+* **api:** add dynamic pagination and update swagger documentation ([80819c5](https://github.com/prep-your-meal/backend/commit/80819c5adf833be35e1914d8fc0ab804e8ed70a9))
+
 ## [1.8.6](https://github.com/prep-your-meal/backend/compare/v1.8.5...v1.8.6) (2026-08-21)
 
 ## [1.8.5](https://github.com/prep-your-meal/backend/compare/v1.8.4...v1.8.5) (2026-08-21)
