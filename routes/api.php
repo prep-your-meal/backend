@@ -21,14 +21,14 @@ Route::middleware('throttle:5,1')->group(function () {
     Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->name('password.reset');
 });
 
-// Socialite
+// Socialite OAuth
 Route::get('/auth/{provider}/redirect', [AuthController::class, 'redirectToProvider']);
 Route::get('/auth/{provider}/callback', [AuthController::class, 'handleProviderCallback']);
 
-// GitHub Webhook
+// GitHub Webhook for recipe synchronization
 Route::post('/webhooks/github', [WebhookController::class, 'handle']);
 
-// Meta
+// Meta data (categories, diets, etc.)
 Route::get('/meta/categories', [MetaController::class, 'categories']);
 
 // Recipes
@@ -36,6 +36,27 @@ Route::get('/meta/categories', [MetaController::class, 'categories']);
 Route::get('/recipes', [RecipeController::class, 'index'])->middleware('throttle:60,1');
 // Limit to 30 requests per minute per user/IP to prevent flooding and scraping
 Route::get('/recipes/{slug}', [RecipeController::class, 'show'])->middleware('throttle:30,1');
+
+// Serve Recipe Images (Strato File Bypass)
+// Intercepts the image request to bypass restrictive web server configurations.
+// IMPORTANT: No ->name() is assigned here to avoid any caching collisions!
+Route::get('/recipes/images/{filename}', function ($filename) {
+    $path = public_path("recipes/images/{$filename}");
+
+    if (file_exists($path)) {
+        $extension = pathinfo($path, PATHINFO_EXTENSION);
+        $mime = match ($extension) {
+            'webp' => 'image/webp',
+            'png' => 'image/png',
+            'jpg', 'jpeg' => 'image/jpeg',
+            default => 'application/octet-stream'
+        };
+
+        return response()->file($path, ['Content-Type' => $mime]);
+    }
+
+    abort(404, 'Recipe image not found on server.');
+});
 
 // Serve general information about the API
 Route::get('/', function () {

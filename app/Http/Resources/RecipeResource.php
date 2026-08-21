@@ -22,7 +22,7 @@ class RecipeResource extends JsonResource
             'slug' => $this->slug,
             'title' => $this->title,
             'instructions' => $this->instructions,
-            'image' => $this->image,
+            'image' => $this->image ? url('api/'.$this->image) : null,
             'prep_time' => $this->prep_time,
             'cook_time' => $this->cook_time,
             'default_portions' => $this->default_portions,
