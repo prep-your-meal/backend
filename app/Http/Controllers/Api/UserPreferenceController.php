@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\UserResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -14,7 +15,7 @@ class UserPreferenceController extends Controller
     #[OA\Get(
         path: '/user/preferences',
         summary: 'Retrieve user preferences',
-        description: "Returns the currently authenticated user's meal plan preferences.",
+        description: "Returns the currently authenticated user's profile and meal plan preferences.",
         security: [['bearerAuth' => []]],
         tags: ['User']
     )]
@@ -28,6 +29,9 @@ class UserPreferenceController extends Controller
                     property: 'data',
                     type: 'object',
                     properties: [
+                        new OA\Property(property: 'id', type: 'integer', example: 1),
+                        new OA\Property(property: 'name', type: 'string', example: 'John Doe'),
+                        new OA\Property(property: 'email', type: 'string', example: 'john@example.com'),
                         new OA\Property(property: 'target_meals_per_week', type: 'integer', example: 3),
                         new OA\Property(property: 'default_portions', type: 'integer', example: 2),
                         new OA\Property(
@@ -59,19 +63,10 @@ class UserPreferenceController extends Controller
     #[OA\Response(response: 401, description: 'Unauthenticated')]
     public function show(Request $request): JsonResponse
     {
-        $user = $request->user();
-
+        // Return the standardized UserResource
         return response()->json([
             'status' => 'success',
-            'data' => [
-                'target_meals_per_week' => $user->target_meals_per_week,
-                'default_portions' => $user->default_portions ?? 2, // Default value for new users
-                'dietary_preferences' => $user->dietary_preferences ?? [],
-                'fitness_goals' => $user->fitness_goals ?? [],
-                'logistics_preferences' => $user->logistics_preferences ?? [],
-                'allergies' => $user->allergies ?? [],
-                'minimize_food_waste' => (bool) ($user->minimize_food_waste ?? true),
-            ],
+            'data' => new UserResource($request->user()),
         ]);
     }
 
@@ -147,18 +142,11 @@ class UserPreferenceController extends Controller
         // Invalidate the generated plan cache so new preferences apply immediately
         Cache::forget("meal_plan_user_{$user->id}");
 
+        // Return the standardized UserResource so the frontend can update its global state
         return response()->json([
             'status' => 'success',
             'message' => 'User preferences updated successfully.',
-            'data' => [
-                'target_meals_per_week' => $user->target_meals_per_week,
-                'default_portions' => $user->default_portions,
-                'dietary_preferences' => $user->dietary_preferences,
-                'fitness_goals' => $user->fitness_goals,
-                'logistics_preferences' => $user->logistics_preferences,
-                'allergies' => $user->allergies,
-                'minimize_food_waste' => (bool) ($user->minimize_food_waste ?? true),
-            ],
+            'data' => new UserResource($user),
         ]);
     }
 }

@@ -27,7 +27,7 @@ class UserPreferenceTest extends TestCase
     }
 
     /**
-     * Test fetching user preferences returns defaults for new users.
+     * Test fetching user preferences returns the full UserResource with defaults for new users.
      */
     public function test_user_can_retrieve_default_preferences(): void
     {
@@ -44,20 +44,25 @@ class UserPreferenceTest extends TestCase
             ->assertJsonStructure([
                 'status',
                 'data' => [
+                    'id',                    // <-- NEW: Provided by UserResource
+                    'name',                  // <-- NEW: Provided by UserResource
+                    'email',                 // <-- NEW: Provided by UserResource
                     'target_meals_per_week',
-                    'default_portions',      // <-- NEW
+                    'default_portions',
                     'dietary_preferences',
                     'fitness_goals',
                     'logistics_preferences',
-                    'allergies',             // <-- NEW
+                    'allergies',
                     'minimize_food_waste',
                 ],
             ])
+            ->assertJsonPath('data.id', $user->id)
             ->assertJsonPath('data.target_meals_per_week', 3)
             ->assertJsonPath('data.default_portions', 2) // <-- Default value from database
             ->assertJsonPath('data.dietary_preferences', [])
             ->assertJsonPath('data.allergies', [])       // <-- Default empty array
-            ->assertJsonPath('data.minimize_food_waste', true);
+            ->assertJsonPath('data.minimize_food_waste', true)
+            ->assertJsonMissing(['created_at', 'updated_at']); // Verify sensitive fields are hidden
     }
 
     /**
@@ -85,7 +90,8 @@ class UserPreferenceTest extends TestCase
         $response = $this->putJson('/user/preferences', $payload);
 
         $response->assertStatus(200)
-            ->assertJsonPath('status', 'success');
+            ->assertJsonPath('status', 'success')
+            ->assertJsonPath('data.target_meals_per_week', 5); // Verify the resource returns the updated value
 
         // Verify database was actually updated
         $this->assertDatabaseHas('users', [

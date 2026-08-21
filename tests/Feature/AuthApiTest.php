@@ -29,7 +29,18 @@ class AuthApiTest extends TestCase
             ->assertJsonStructure([
                 'status',
                 'token',
-                'user',
+                'user' => [
+                    'id',
+                    'name',
+                    'email',
+                    'target_meals_per_week',
+                    'default_portions',
+                    'dietary_preferences',
+                    'fitness_goals',
+                    'logistics_preferences',
+                    'allergies',
+                    'minimize_food_waste',
+                ],
             ])
             ->assertJsonFragment([
                 'status' => 'success',
@@ -107,7 +118,15 @@ class AuthApiTest extends TestCase
                 'status',
                 'message',
                 'token',
-                'user' => ['id', 'name', 'email'],
+                'user' => [
+                    'id',
+                    'name',
+                    'email',
+                    'target_meals_per_week',
+                    'default_portions',
+                    'dietary_preferences',
+                    'allergies',
+                ],
             ]);
 
         $this->assertDatabaseHas('users', [
@@ -139,13 +158,26 @@ class AuthApiTest extends TestCase
         $response = $this->getJson('/user');
 
         $response->assertStatus(200)
-            ->assertJson([
-                'status' => 'success',
+            ->assertJsonStructure([
+                'status',
                 'data' => [
-                    'id' => $user->id,
-                    'name' => 'Test User',
+                    'id',
+                    'name',
+                    'email',
+                    'target_meals_per_week',
+                    'default_portions',
+                    'dietary_preferences',
+                    'fitness_goals',
+                    'logistics_preferences',
+                    'allergies',
+                    'minimize_food_waste',
                 ],
-            ]);
+            ])
+            ->assertJsonFragment([
+                'id' => $user->id,
+                'name' => 'Test User',
+            ])
+            ->assertJsonMissing(['created_at', 'updated_at']); // Proves the resource strips timestamps
     }
 
     public function test_user_can_request_password_reset_link()
