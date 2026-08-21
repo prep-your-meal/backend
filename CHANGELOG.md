@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.9.1](https://github.com/prep-your-meal/backend/compare/v1.9.0...v1.9.1) (2026-08-21)
+
+
+### Bug Fixes
+
+* **api:** serve recipe images via custom route and fix url generation ([0a5793a](https://github.com/prep-your-meal/backend/commit/0a5793a7fc8d4c2785d7f5951385821540debb3d))
+
 ## [1.9.0](https://github.com/prep-your-meal/backend/compare/v1.8.6...v1.9.0) (2026-08-21)
 
 
