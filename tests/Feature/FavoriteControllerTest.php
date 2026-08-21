@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Ingredient;
 use App\Models\Recipe;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -82,13 +83,15 @@ class FavoriteControllerTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $recipe1 = Recipe::forceCreate([
-            'slug' => 'favorite-recipe',
-            'title' => ['en' => 'Favorite Recipe'],
-            'calories' => 400,
-        ]);
+        $recipe1 = Recipe::factory()
+            ->hasAttached(Ingredient::factory()->count(1), ['amount' => 50])
+            ->create([
+                'slug' => 'favorite-recipe',
+                'title' => ['en' => 'Favorite Recipe'],
+                'calories' => 400,
+            ]);
 
-        $recipe2 = Recipe::forceCreate([
+        $recipe2 = Recipe::factory()->create([
             'slug' => 'other-recipe',
             'title' => ['en' => 'Other Recipe'],
             'calories' => 600,
@@ -102,12 +105,19 @@ class FavoriteControllerTest extends TestCase
             ->assertJsonStructure([
                 'status',
                 'data' => [
-                    '*' => ['slug', 'title'],
+                    '*' => [
+                        'slug',
+                        'title',
+                        'ingredients' => [
+                            '*' => ['amount'], // Ensures Resource formatting is active
+                        ],
+                    ],
                 ],
                 'meta' => ['current_page', 'last_page', 'total'],
             ]);
 
         $this->assertCount(1, $response->json('data'));
         $this->assertEquals('favorite-recipe', $response->json('data.0.slug'));
+        $this->assertArrayNotHasKey('pivot', $response->json('data.0.ingredients.0'));
     }
 }

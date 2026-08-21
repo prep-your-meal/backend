@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\RecipeResource;
 use App\Models\MealPlan;
 use App\Models\Recipe;
 use Illuminate\Database\Eloquent\Builder;
@@ -28,6 +29,7 @@ class PlanController extends Controller
         try {
             $today = Carbon::today();
             $userId = $request->user()->id;
+            $locale = $request->getPreferredLanguage(['en', 'de']);
 
             $currentPlan = Cache::remember("meal_plan_user_{$userId}", now()->endOfWeek(), function () use ($userId, $today) {
                 return MealPlan::with(['recipe.ingredients'])
@@ -45,9 +47,24 @@ class PlanController extends Controller
                 ]);
             }
 
+            // Format the plan data to map the nested recipe through the RecipeResource
+            $formattedPlan = $currentPlan->map(function ($plan) use ($locale) {
+                $planData = $plan->toArray();
+
+                if ($plan->recipe) {
+                    /** @var Recipe $recipe */
+                    $recipe = $plan->recipe;
+                    $clonedRecipe = clone $recipe;
+                    $clonedRecipe->title = $clonedRecipe->title[$locale] ?? $clonedRecipe->title['en'] ?? $clonedRecipe->slug;
+                    $planData['recipe'] = new RecipeResource($clonedRecipe);
+                }
+
+                return $planData;
+            });
+
             return response()->json([
                 'status' => 'success',
-                'data' => $currentPlan,
+                'data' => $formattedPlan,
             ]);
 
         } catch (\Exception $e) {
@@ -75,6 +92,7 @@ class PlanController extends Controller
         try {
             $user = $request->user();
             $userId = $user->id;
+            $locale = $request->getPreferredLanguage(['en', 'de']);
 
             $targetMeals = $user->target_meals_per_week ?? 7;
             $defaultPortions = $user->default_portions ?? 2;
@@ -83,7 +101,7 @@ class PlanController extends Controller
             $query = $this->buildPreferenceQuery($user);
             $availableRecipes = $query->get();
 
-            // Fallback: Drop nice-to-have preferences, but KEEP strict allergy blacklist
+            // 2. Fallback: Drop nice-to-have preferences, but KEEP strict allergy blacklist
             if ($availableRecipes->isEmpty()) {
                 $availableRecipes = $this->buildAllergyFallbackQuery($user)->get();
             }
@@ -151,9 +169,13 @@ class PlanController extends Controller
                     'portions' => $defaultPortions,
                 ]);
 
+                // Localize title and format resource for the response
+                $clonedRecipe = clone $recipe;
+                $clonedRecipe->title = $clonedRecipe->title[$locale] ?? $clonedRecipe->title['en'] ?? $clonedRecipe->slug;
+
                 $planResponse[] = [
                     'date' => $scheduledDate->format('Y-m-d'),
-                    'recipe' => $recipe,
+                    'recipe' => new RecipeResource($clonedRecipe),
                 ];
             }
 
@@ -189,6 +211,7 @@ class PlanController extends Controller
     public function swap(Request $request, string $date): JsonResponse
     {
         $user = $request->user();
+        $locale = $request->getPreferredLanguage(['en', 'de']);
 
         $mealPlan = MealPlan::where('user_id', $user->id)
             ->where('scheduled_for', $date)
@@ -225,10 +248,22 @@ class PlanController extends Controller
         $mealPlan->update(['recipe_slug' => $newRecipe->slug]);
         Cache::forget("meal_plan_user_{$user->id}");
 
+        $mealPlan->load('recipe.ingredients');
+        $responseData = $mealPlan->toArray();
+
+        // Format resource for response
+        if ($mealPlan->recipe) {
+            /** @var Recipe $recipe */
+            $recipe = $mealPlan->recipe;
+            $clonedRecipe = clone $recipe;
+            $clonedRecipe->title = $clonedRecipe->title[$locale] ?? $clonedRecipe->title['en'] ?? $clonedRecipe->slug;
+            $responseData['recipe'] = new RecipeResource($clonedRecipe);
+        }
+
         return response()->json([
             'status' => 'success',
             'message' => 'Meal successfully swapped.',
-            'data' => $mealPlan->load('recipe.ingredients'),
+            'data' => $responseData,
         ]);
     }
 
@@ -256,6 +291,7 @@ class PlanController extends Controller
 
         $user = $request->user();
         $defaultPortions = $user->default_portions ?? 2;
+        $locale = $request->getPreferredLanguage(['en', 'de']);
 
         // Use updateOrCreate so if a meal already exists for this date, it gets overwritten
         $mealPlan = MealPlan::updateOrCreate(
@@ -265,10 +301,22 @@ class PlanController extends Controller
 
         Cache::forget("meal_plan_user_{$user->id}");
 
+        $mealPlan->load('recipe.ingredients');
+        $responseData = $mealPlan->toArray();
+
+        // Format resource for response
+        if ($mealPlan->recipe) {
+            /** @var Recipe $recipe */
+            $recipe = $mealPlan->recipe;
+            $clonedRecipe = clone $recipe;
+            $clonedRecipe->title = $clonedRecipe->title[$locale] ?? $clonedRecipe->title['en'] ?? $clonedRecipe->slug;
+            $responseData['recipe'] = new RecipeResource($clonedRecipe);
+        }
+
         return response()->json([
             'status' => 'success',
             'message' => 'Meal successfully scheduled.',
-            'data' => $mealPlan->load('recipe.ingredients'),
+            'data' => $responseData,
         ]);
     }
 

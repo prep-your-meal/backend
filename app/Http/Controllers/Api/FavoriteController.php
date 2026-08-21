@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\RecipeResource;
 use App\Models\Recipe;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
@@ -18,15 +19,23 @@ class FavoriteController extends Controller
     #[OA\Response(response: 200, description: 'List of favorite recipes')]
     public function index(Request $request)
     {
-        // Fetch the current user's favorite recipes, paginated for the PWA frontend
-        $favorites = $request->user()->favoriteRecipes()->paginate(15);
+        // 1. Determine the best language match
+        $locale = $request->getPreferredLanguage(['en', 'de']);
 
-        // Optional: Apply the same multi-language localization logic for the title
-        // here as seen in the RecipeController, if required.
+        // 2. Fetch the current user's favorite recipes with ingredients, paginated for the PWA frontend
+        $favorites = $request->user()->favoriteRecipes()->with('ingredients')->paginate(15);
 
+        // 3. Transform the paginated items to flatten the localized title
+        $favorites->getCollection()->transform(function ($recipe) use ($locale) {
+            $recipe->title = $recipe->title[$locale] ?? $recipe->title['en'] ?? $recipe->slug;
+
+            return $recipe;
+        });
+
+        // 4. Return the response using the RecipeResource collection
         return response()->json([
             'status' => 'success',
-            'data' => $favorites->items(),
+            'data' => RecipeResource::collection($favorites->getCollection()),
             'meta' => [
                 'current_page' => $favorites->currentPage(),
                 'last_page' => $favorites->lastPage(),

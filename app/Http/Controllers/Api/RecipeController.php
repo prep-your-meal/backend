@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\RecipeResource;
 use App\Models\Recipe;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,7 +26,7 @@ class RecipeController extends Controller
 
         $query = Recipe::query();
 
-        // Apply filters (using the new canonical logic)
+        // Apply filters (using the canonical logic)
         $query->when($request->query('category'), function ($q, $category) {
             $q->whereJsonContains('categories', $category);
         });
@@ -43,14 +44,16 @@ class RecipeController extends Controller
 
         // 2. Transform the paginated items to flatten the localized title for the frontend
         $recipes->getCollection()->transform(function ($recipe) use ($locale) {
+            // Mutate the title on the model instance before passing it to the resource
             $recipe->title = $recipe->title[$locale] ?? $recipe->title['en'] ?? $recipe->slug;
 
             return $recipe;
         });
 
+        // 3. Return the custom JSON structure using the RecipeResource collection to format the items
         return response()->json([
             'status' => 'success',
-            'data' => $recipes->items(),
+            'data' => RecipeResource::collection($recipes->getCollection()),
             'meta' => [
                 'current_page' => $recipes->currentPage(),
                 'last_page' => $recipes->lastPage(),
@@ -79,20 +82,21 @@ class RecipeController extends Controller
         // 1. Determine the preferred language
         $locale = $request->getPreferredLanguage(['en', 'de']);
 
-        // 2. Load from cache (the raw model with the JSON array)
+        // 2. Load from cache (the raw model with the JSON array and relationships)
         $recipe = Cache::rememberForever("recipe_{$slug}", function () use ($slug) {
             return Recipe::with('ingredients')->where('slug', $slug)->firstOrFail();
         });
 
-        // 3. Convert to array so we don't accidentally mutate the cached object instance
-        $responseData = $recipe->toArray();
+        // 3. Clone the model so we do not accidentally mutate the cached object instance in memory
+        $clonedRecipe = clone $recipe;
 
         // 4. Flatten the localized title
-        $responseData['title'] = $recipe->title[$locale] ?? $recipe->title['en'] ?? $recipe->slug;
+        $clonedRecipe->title = $clonedRecipe->title[$locale] ?? $clonedRecipe->title['en'] ?? $clonedRecipe->slug;
 
+        // 5. Return the JSON response wrapping the model in our new RecipeResource
         return response()->json([
             'status' => 'success',
-            'data' => $responseData,
+            'data' => new RecipeResource($clonedRecipe),
         ]);
     }
 }

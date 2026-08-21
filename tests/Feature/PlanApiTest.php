@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Ingredient;
 use App\Models\MealPlan;
 use App\Models\Recipe;
 use App\Models\User;
@@ -59,8 +60,10 @@ class PlanApiTest extends TestCase
         ]);
         Sanctum::actingAs($user, ['*']);
 
-        // Create 7 dummy recipes to satisfy the default 7-day requirement
-        Recipe::factory()->count(7)->create();
+        // Create 7 dummy recipes with attached ingredients to test resource formatting
+        Recipe::factory()->count(7)
+            ->hasAttached(Ingredient::factory()->count(2), ['amount' => 100])
+            ->create();
 
         $response = $this->postJson('/plan/generate');
 
@@ -78,6 +81,12 @@ class PlanApiTest extends TestCase
             'user_id' => $user->id,
             'portions' => 4,
         ]);
+
+        // Assert that the returned recipe uses the RecipeResource (flattened ingredients without pivot)
+        $firstMeal = $response->json('data.0.recipe');
+        $this->assertArrayHasKey('ingredients', $firstMeal);
+        $this->assertArrayHasKey('amount', $firstMeal['ingredients'][0]);
+        $this->assertArrayNotHasKey('pivot', $firstMeal['ingredients'][0]);
     }
 
     public function test_respects_target_meals_per_week_preference()
@@ -255,9 +264,11 @@ class PlanApiTest extends TestCase
         $user = User::factory()->create();
         Sanctum::actingAs($user, ['*']);
 
-        // Create two recipes
+        // Create two recipes with ingredients
         $recipe1 = Recipe::factory()->create(['slug' => 'first-recipe']);
-        $recipe2 = Recipe::factory()->create(['slug' => 'alternative-recipe']);
+        $recipe2 = Recipe::factory()
+            ->hasAttached(Ingredient::factory()->count(1), ['amount' => 50])
+            ->create(['slug' => 'alternative-recipe']);
 
         // Schedule the first recipe for today
         $today = Carbon::today()->format('Y-m-d');
@@ -283,6 +294,10 @@ class PlanApiTest extends TestCase
             'scheduled_for' => $today,
             'recipe_slug' => $recipe2->slug,
         ]);
+
+        // Assert resource formatting on swapped meal
+        $this->assertArrayHasKey('amount', $response->json('data.recipe.ingredients.0'));
+        $this->assertArrayNotHasKey('pivot', $response->json('data.recipe.ingredients.0'));
     }
 
     public function test_swap_fails_if_no_meal_is_scheduled_for_date()
@@ -308,7 +323,9 @@ class PlanApiTest extends TestCase
         ]);
         Sanctum::actingAs($user, ['*']);
 
-        $recipe = Recipe::factory()->create(['slug' => 'my-favorite-curry']);
+        $recipe = Recipe::factory()
+            ->hasAttached(Ingredient::factory()->count(1), ['amount' => 50])
+            ->create(['slug' => 'my-favorite-curry']);
         $date = Carbon::today()->format('Y-m-d');
 
         $response = $this->postJson("/plan/{$date}/add", [
@@ -328,6 +345,10 @@ class PlanApiTest extends TestCase
             'recipe_slug' => $recipe->slug,
             'portions' => 3,
         ]);
+
+        // Assert resource formatting on added meal
+        $this->assertArrayHasKey('amount', $response->json('data.recipe.ingredients.0'));
+        $this->assertArrayNotHasKey('pivot', $response->json('data.recipe.ingredients.0'));
     }
 
     public function test_user_can_clear_a_meal_for_a_specific_date()

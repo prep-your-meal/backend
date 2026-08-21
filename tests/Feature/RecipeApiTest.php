@@ -13,8 +13,7 @@ class RecipeApiTest extends TestCase
 
     public function test_user_can_retrieve_single_recipe()
     {
-
-        // Create a recipe with ingredients to test eager loading
+        // Create a recipe with ingredients to test eager loading and resource transformation
         $recipe = Recipe::factory()
             ->hasAttached(
                 Ingredient::factory()->count(3),
@@ -32,11 +31,16 @@ class RecipeApiTest extends TestCase
 
         // Ensure ingredients are loaded in the response
         $this->assertCount(3, $response->json('data.ingredients'));
+
+        // Validate that the IngredientResource correctly flattened the pivot data
+        $firstIngredient = $response->json('data.ingredients.0');
+        $this->assertArrayHasKey('amount', $firstIngredient);
+        $this->assertEquals(200, $firstIngredient['amount']);
+        $this->assertArrayNotHasKey('pivot', $firstIngredient);
     }
 
     public function test_returns_404_for_invalid_recipe()
     {
-
         $response = $this->getJson('/recipes/invalid-slug');
 
         $response->assertStatus(404);
@@ -44,7 +48,6 @@ class RecipeApiTest extends TestCase
 
     public function test_can_retrieve_paginated_list_of_recipes()
     {
-
         // Create 20 recipes
         Recipe::factory()->count(20)->create();
 
@@ -59,7 +62,6 @@ class RecipeApiTest extends TestCase
 
     public function test_can_filter_recipes_by_category()
     {
-
         // Create specific recipes to test the JSON column filtering
         Recipe::factory()->count(3)->create([
             'categories' => ['meat', 'slow'],
@@ -78,7 +80,6 @@ class RecipeApiTest extends TestCase
 
     public function test_can_search_recipes_by_title()
     {
-
         // Create specific recipes to test the text search using the correct 'title' column
         Recipe::factory()->create(['title' => 'Spicy Chicken Curry']);
         Recipe::factory()->create(['title' => 'Vegan Beef Burger']);
