@@ -35,9 +35,21 @@ class RecipeController extends Controller
     #[OA\Parameter(
         name: 'category',
         in: 'query',
-        description: 'Filter recipes by a specific category',
+        description: 'Filter recipes by a specific category (e.g., diet, meal type, fitness goal)',
         required: false,
-        schema: new OA\Schema(type: 'string')
+        schema: new OA\Schema(
+            type: 'string',
+            enum: [
+                // Meal Types
+                'breakfast', 'lunch', 'dinner', 'snack',
+                // Diets
+                'vegan', 'vegetarian', 'keto', 'low-carb', 'gluten-free', 'dairy-free',
+                // Fitness Profiles
+                'high-protein', 'bulking', 'cutting', 'balanced',
+                // Logistics
+                'meal-prep-friendly', 'quick', 'one-pot', 'family-friendly',
+            ]
+        )
     )]
     #[OA\Parameter(
         name: 'search',
