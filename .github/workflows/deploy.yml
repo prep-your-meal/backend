@@ -152,6 +152,7 @@ jobs:
             MAIL_PASSWORD=$MAIL_PASSWORD
             MAIL_FROM_ADDRESS="$MAIL_FROM_ADDRESS"
             MAIL_FROM_NAME="PrepYourMeal"
+            SANCTUM_STATEFUL_DOMAINS="prepyourmeal.de"
             EOF
 
             # Generate App Key if missing or invalid
