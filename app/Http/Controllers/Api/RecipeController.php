@@ -67,9 +67,6 @@ class RecipeController extends Controller
     #[OA\Response(response: 200, description: 'List of recipes')]
     public function index(Request $request): JsonResponse
     {
-        // 1. Determine the best language match (defaults to the first array item 'en' if no match)
-        $locale = $request->getPreferredLanguage(['en', 'de']);
-
         // Dynamic pagination parameter
         $perPage = $request->input('per_page', 15);
 
@@ -97,15 +94,7 @@ class RecipeController extends Controller
 
         $recipes = $query->with('ingredients')->paginate($perPage);
 
-        // 2. Transform the paginated items to flatten the localized title for the frontend
-        $recipes->getCollection()->transform(function ($recipe) use ($locale) {
-            // Mutate the title on the model instance before passing it to the resource
-            $recipe->title = $recipe->title[$locale] ?? $recipe->title['en'] ?? $recipe->slug;
-
-            return $recipe;
-        });
-
-        // 3. Return the custom JSON structure using the RecipeResource collection to format the items
+        // Wir rufen nur noch die Resource-Collection auf, das Flattening passiert automatisch!
         return response()->json([
             'status' => 'success',
             'data' => RecipeResource::collection($recipes->getCollection()),
@@ -134,18 +123,9 @@ class RecipeController extends Controller
     #[OA\Response(response: 404, description: 'Recipe not found')]
     public function show(string $slug, Request $request): JsonResponse
     {
-        // 1. Determine the preferred language
-        $locale = $request->getPreferredLanguage(['en', 'de']);
-
-        // 2. Load directly from database (Caching removed to prevent __PHP_Incomplete_Class serialization errors)
+        // Load directly from database with ingredients
         $recipe = Recipe::with('ingredients')->where('slug', $slug)->firstOrFail();
 
-        // 3. Flatten the localized title directly on the instance (no cloning needed anymore)
-        $recipe->title = $recipe->title[$locale] ?? $recipe->title['en'] ?? $recipe->slug;
-
-        $recipe->instructions = $recipe->instructions[$locale] ?? $recipe->instructions['en'] ?? null;
-
-        // 4. Return the JSON response wrapping the model in our RecipeResource
         return response()->json([
             'status' => 'success',
             'data' => new RecipeResource($recipe),

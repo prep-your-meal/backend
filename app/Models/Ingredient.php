@@ -18,6 +18,10 @@ class Ingredient extends Model
 
     protected $fillable = ['slug', 'name', 'unit', 'category'];
 
+    protected $casts = [
+        'name' => 'array',
+    ];
+
     public function recipes(): BelongsToMany
     {
         return $this->belongsToMany(Recipe::class, 'ingredient_recipe', 'ingredient_slug', 'recipe_slug')
