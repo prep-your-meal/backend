@@ -24,9 +24,9 @@ class RecipeResource extends JsonResource
     {
         $locale = $request->getPreferredLanguage(['en', 'de']);
 
-        // Unser Wörterbuch für die Einheiten (erweiterbar für weitere Sprachen)
         $unitTranslations = [
             'de' => [
+                'pc' => 'Stück',
                 'pcs' => 'Stück',
                 'tbsp' => 'EL',
                 'tsp' => 'TL',
@@ -68,7 +68,6 @@ class RecipeResource extends JsonResource
                         ? ($rawName[$locale] ?? $rawName['en'] ?? $ingredient->slug)
                         : $rawName;
 
-                    // Einheit übersetzen, falls ein Mapping existiert, ansonsten das Original aus der DB nutzen
                     $rawUnit = strtolower($ingredient->unit);
                     $localizedUnit = $unitTranslations[$locale][$rawUnit] ?? $ingredient->unit;
 
