@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.11.1](https://github.com/prep-your-meal/backend/compare/v1.11.0...v1.11.1) (2026-08-27)
+
+
+### Bug Fixes
+
+* **backend:** extend unit translation for RecipeResource ([59d22ed](https://github.com/prep-your-meal/backend/commit/59d22ed67eb21bfb8f78a223f09ad5a543b60b45))
+
 ## [1.11.0](https://github.com/prep-your-meal/backend/compare/v1.10.0...v1.11.0) (2026-08-27)
 
 
