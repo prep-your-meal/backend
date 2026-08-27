@@ -24,6 +24,21 @@ class RecipeResource extends JsonResource
     {
         $locale = $request->getPreferredLanguage(['en', 'de']);
 
+        // Unser Wörterbuch für die Einheiten (erweiterbar für weitere Sprachen)
+        $unitTranslations = [
+            'de' => [
+                'pcs' => 'Stück',
+                'tbsp' => 'EL',
+                'tsp' => 'TL',
+                'cup' => 'Tasse',
+                'cups' => 'Tassen',
+                'bunch' => 'Bund',
+                'pinch' => 'Prise',
+                'clove' => 'Zehe',
+                'cloves' => 'Zehen',
+            ],
+        ];
+
         return [
             'slug' => $this->slug,
 
@@ -43,8 +58,8 @@ class RecipeResource extends JsonResource
                 'fat_g' => $this->fat_g,
             ],
 
-            'ingredients' => $this->whenLoaded('ingredients', function () use ($locale) {
-                return $this->ingredients->map(function ($ingredient) use ($locale) {
+            'ingredients' => $this->whenLoaded('ingredients', function () use ($locale, $unitTranslations) {
+                return $this->ingredients->map(function ($ingredient) use ($locale, $unitTranslations) {
 
                     /** @var array<string, string>|string $rawName */
                     $rawName = $ingredient->name;
@@ -53,10 +68,14 @@ class RecipeResource extends JsonResource
                         ? ($rawName[$locale] ?? $rawName['en'] ?? $ingredient->slug)
                         : $rawName;
 
+                    // Einheit übersetzen, falls ein Mapping existiert, ansonsten das Original aus der DB nutzen
+                    $rawUnit = strtolower($ingredient->unit);
+                    $localizedUnit = $unitTranslations[$locale][$rawUnit] ?? $ingredient->unit;
+
                     return [
                         'slug' => $ingredient->slug,
                         'name' => $localizedName,
-                        'unit' => $ingredient->unit,
+                        'unit' => $localizedUnit,
                         'category' => $ingredient->category,
                         'amount' => $ingredient->pivot->amount ?? 0,
                     ];
