@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.11.2](https://github.com/prep-your-meal/backend/compare/v1.11.1...v1.11.2) (2026-08-27)
+
+
+### Bug Fixes
+
+* **backend:** include api prefix in recipe image paths during github sync ([012af9c](https://github.com/prep-your-meal/backend/commit/012af9cd5e199e5b5297f86bd74dcf2b2a653faf))
+
 ## [1.11.1](https://github.com/prep-your-meal/backend/compare/v1.11.0...v1.11.1) (2026-08-27)
 
 
