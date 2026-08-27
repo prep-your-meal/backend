@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.10.0](https://github.com/prep-your-meal/backend/compare/v1.9.3...v1.10.0) (2026-08-27)
+
+
+### Features
+
+* **api:** support random ordering for recipe list via query parameter ([1c6ae17](https://github.com/prep-your-meal/backend/commit/1c6ae174cbc857b8f788c32d81d1bc5ab661df0f))
+
+
+### Bug Fixes
+
+* **api:** remove caching on recipe detail to fix serialization errors ([564fc44](https://github.com/prep-your-meal/backend/commit/564fc44fe62b971aca3ea0bc6b12be6b0e8d2010))
+* **backend:** store ingredient names as localized arrays in webhook sync ([895678a](https://github.com/prep-your-meal/backend/commit/895678acdc9f800a9dc463c76071102d4f7cbbc1))
+
 ## [1.9.3](https://github.com/prep-your-meal/backend/compare/v1.9.2...v1.9.3) (2026-08-22)
 
 
