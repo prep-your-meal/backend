@@ -57,6 +57,13 @@ class RecipeController extends Controller
         required: false,
         schema: new OA\Schema(type: 'string')
     )]
+    #[OA\Parameter(
+        name: 'random',
+        in: 'query',
+        description: 'If true, returns recipes in a random order instead of chronological',
+        required: false,
+        schema: new OA\Schema(type: 'boolean', default: false)
+    )]
     #[OA\Response(response: 200, description: 'List of recipes')]
     public function index(Request $request): JsonResponse
     {
@@ -80,9 +87,15 @@ class RecipeController extends Controller
             $q->where('title', 'like', '%'.$search.'%');
         });
 
-        $recipes = $query->with('ingredients')
-            ->orderBy('created_at', 'desc')
-            ->paginate($perPage);
+        // Apply random ordering if the 'random' query parameter is true
+        // Otherwise, fallback to the default chronological order
+        if ($request->boolean('random')) {
+            $query->inRandomOrder();
+        } else {
+            $query->orderBy('created_at', 'desc');
+        }
+
+        $recipes = $query->with('ingredients')->paginate($perPage);
 
         // 2. Transform the paginated items to flatten the localized title for the frontend
         $recipes->getCollection()->transform(function ($recipe) use ($locale) {
