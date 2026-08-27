@@ -7,7 +7,6 @@ use App\Http\Resources\RecipeResource;
 use App\Models\Recipe;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 use OpenApi\Attributes as OA;
 
 class RecipeController extends Controller
@@ -125,21 +124,16 @@ class RecipeController extends Controller
         // 1. Determine the preferred language
         $locale = $request->getPreferredLanguage(['en', 'de']);
 
-        // 2. Load from cache (the raw model with the JSON array and relationships)
-        $recipe = Cache::rememberForever("recipe_{$slug}", function () use ($slug) {
-            return Recipe::with('ingredients')->where('slug', $slug)->firstOrFail();
-        });
+        // 2. Load directly from database (Caching removed to prevent __PHP_Incomplete_Class serialization errors)
+        $recipe = Recipe::with('ingredients')->where('slug', $slug)->firstOrFail();
 
-        // 3. Clone the model so we do not accidentally mutate the cached object instance in memory
-        $clonedRecipe = clone $recipe;
+        // 3. Flatten the localized title directly on the instance (no cloning needed anymore)
+        $recipe->title = $recipe->title[$locale] ?? $recipe->title['en'] ?? $recipe->slug;
 
-        // 4. Flatten the localized title
-        $clonedRecipe->title = $clonedRecipe->title[$locale] ?? $clonedRecipe->title['en'] ?? $clonedRecipe->slug;
-
-        // 5. Return the JSON response wrapping the model in our new RecipeResource
+        // 4. Return the JSON response wrapping the model in our RecipeResource
         return response()->json([
             'status' => 'success',
-            'data' => new RecipeResource($clonedRecipe),
+            'data' => new RecipeResource($recipe),
         ]);
     }
 }
