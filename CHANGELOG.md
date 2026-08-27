@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.11.0](https://github.com/prep-your-meal/backend/compare/v1.10.0...v1.11.0) (2026-08-27)
+
+
+### Features
+
+* **backend:** localize ingredient units directly in RecipeResource ([653b6e9](https://github.com/prep-your-meal/backend/commit/653b6e9827413d13bd00c3fe55c29d62282afc29))
+
 ## [1.10.0](https://github.com/prep-your-meal/backend/compare/v1.9.3...v1.10.0) (2026-08-27)
 
 
