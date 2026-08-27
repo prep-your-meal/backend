@@ -236,7 +236,7 @@ class WebhookController extends Controller
                 'default_portions' => $meta['default_portions'] ?? 2,
                 'categories' => $meta['categories'] ?? [],
                 'ingredients' => $meta['ingredients'] ?? [],
-                'image' => "recipes/images/{$slug}.webp",
+                'image' => "api/recipes/images/{$slug}.webp",
                 'nutrition_per_portion' => $meta['nutrition_per_portion'] ?? [],
             ];
         }
