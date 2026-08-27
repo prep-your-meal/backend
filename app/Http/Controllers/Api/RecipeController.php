@@ -143,6 +143,8 @@ class RecipeController extends Controller
         // 3. Flatten the localized title directly on the instance (no cloning needed anymore)
         $recipe->title = $recipe->title[$locale] ?? $recipe->title['en'] ?? $recipe->slug;
 
+        $recipe->instructions = $recipe->instructions[$locale] ?? $recipe->instructions['en'] ?? null;
+
         // 4. Return the JSON response wrapping the model in our RecipeResource
         return response()->json([
             'status' => 'success',

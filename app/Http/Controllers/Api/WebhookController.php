@@ -45,6 +45,7 @@ class WebhookController extends Controller
             $this->syncMasterIngredients($storageBasePath.'/recipes/ingredients.yaml');
 
             // 3. Parse recipe bundles
+            $this->parseRecipesFromDirectory($storageBasePath);
             $parsedRecipes = $this->parseRecipesFromDirectory($storageBasePath);
 
             // 4. Sync recipes to DB
@@ -180,8 +181,11 @@ class WebhookController extends Controller
             Ingredient::updateOrCreate(
                 ['slug' => $slug],
                 [
-                    // Adjust this based on whether your 'name' column uses Spatie Translatable or is a simple string
-                    'name' => $data['en'] ?? ($data['de'] ?? $slug),
+                    // Wir speichern den Namen nun als Array ab, genau wie bei den Rezepten
+                    'name' => [
+                        'en' => $data['en'] ?? $slug,
+                        'de' => $data['de'] ?? $slug,
+                    ],
                     'unit' => $data['unit'] ?? '',
                     'category' => $data['category'] ?? 'misc',
                 ]
