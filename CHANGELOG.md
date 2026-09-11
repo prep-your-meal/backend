@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.11.7](https://github.com/prep-your-meal/backend/compare/v1.11.6...v1.11.7) (2026-09-11)
+
+
+### Bug Fixes
+
+* **auth:** resolve email verification routing error for stateless api ([c80d62b](https://github.com/prep-your-meal/backend/commit/c80d62bd620c299a877245af5fff274a5752b9c5))
+
 ## [1.11.6](https://github.com/prep-your-meal/backend/compare/v1.11.5...v1.11.6) (2026-09-10)
 
 ## [1.11.5](https://github.com/prep-your-meal/backend/compare/v1.11.4...v1.11.5) (2026-09-10)
