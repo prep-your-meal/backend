@@ -113,20 +113,15 @@ class AuthApiTest extends TestCase
             'password_confirmation' => 'supersecret123',
         ]);
 
+        // Wir erwarten jetzt nur noch status und message, da kein Auto-Login mehr stattfindet
         $response->assertStatus(201)
             ->assertJsonStructure([
                 'status',
                 'message',
-                'token',
-                'user' => [
-                    'id',
-                    'name',
-                    'email',
-                    'target_meals_per_week',
-                    'default_portions',
-                    'dietary_preferences',
-                    'allergies',
-                ],
+            ])
+            ->assertJsonFragment([
+                'status' => 'success',
+                'message' => 'User registered. Please check your emails for the verification link.',
             ]);
 
         $this->assertDatabaseHas('users', [
@@ -220,5 +215,79 @@ class AuthApiTest extends TestCase
 
         // Verify the password was actually changed in the database
         $this->assertTrue(Hash::check('newpassword123', $user->fresh()->password));
+    }
+
+    public function test_login_fails_if_email_is_unverified()
+    {
+        $user = User::factory()->create([
+            'email' => 'unverified@prepyourmeal.local',
+            'password' => Hash::make('secret123'),
+            'email_verified_at' => null, // Explicitly unverified
+        ]);
+
+        $response = $this->postJson('/auth/login', [
+            'email' => 'unverified@prepyourmeal.local',
+            'password' => 'secret123',
+        ]);
+
+        $response->assertStatus(403)
+            ->assertJson([
+                'status' => 'error',
+                'message' => 'Please verify your email address before logging in.',
+                'needs_verification' => true,
+            ]);
+    }
+
+    public function test_user_can_update_profile_name_without_losing_verification()
+    {
+        $user = User::factory()->create([
+            'email' => 'stable@example.com',
+            'email_verified_at' => now(),
+        ]);
+
+        $token = $user->createToken('test-token')->plainTextToken;
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$token,
+        ])->putJson('/user/profile', [
+            'name' => 'New Name',
+            'email' => 'stable@example.com', // Unchanged
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonFragment(['message' => 'Profile updated.']);
+
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'name' => 'New Name',
+        ]);
+
+        $this->assertNotNull($user->fresh()->email_verified_at);
+    }
+
+    public function test_user_loses_verification_when_updating_email()
+    {
+        $user = User::factory()->create([
+            'email' => 'old@example.com',
+            'email_verified_at' => now(),
+        ]);
+
+        $token = $user->createToken('test-token')->plainTextToken;
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$token,
+        ])->putJson('/user/profile', [
+            'name' => $user->name,
+            'email' => 'new@example.com', // Changed
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonFragment(['message' => 'Profile updated. Please verify your new email.']);
+
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'email' => 'new@example.com',
+            'email_verified_at' => null, // Must be null now
+        ]);
     }
 }

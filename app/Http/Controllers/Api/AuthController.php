@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -33,6 +34,7 @@ class AuthController extends Controller
     )]
     #[OA\Response(response: 200, description: 'Login successful, returns Sanctum token')]
     #[OA\Response(response: 401, description: 'Invalid credentials')]
+    #[OA\Response(response: 403, description: 'Email address not verified')]
     public function login(Request $request)
     {
         $request->validate([
@@ -47,6 +49,14 @@ class AuthController extends Controller
                 'status' => 'error',
                 'message' => 'Invalid credentials',
             ], 401);
+        }
+
+        if (! $user->hasVerifiedEmail()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Please verify your email address before logging in.',
+                'needs_verification' => true,
+            ], 403);
         }
 
         // Generate Sanctum Token
@@ -76,7 +86,7 @@ class AuthController extends Controller
             ]
         )
     )]
-    #[OA\Response(response: 201, description: 'User registered successfully')]
+    #[OA\Response(response: 201, description: 'User registered successfully, verification email sent')]
     #[OA\Response(response: 422, description: 'Validation errors')]
     public function register(Request $request): JsonResponse
     {
@@ -92,13 +102,11 @@ class AuthController extends Controller
             'password' => Hash::make($validated['password']),
         ]);
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+        event(new Registered($user));
 
         return response()->json([
             'status' => 'success',
-            'message' => 'User registered successfully.',
-            'token' => $token,
-            'user' => new UserResource($user),
+            'message' => 'User registered. Please check your emails for the verification link.',
         ], 201);
     }
 
@@ -114,6 +122,56 @@ class AuthController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => new UserResource($request->user()),
+        ]);
+    }
+
+    #[OA\Put(
+        path: '/user/profile',
+        summary: 'Update basic user profile (Name & Email)',
+        description: 'Updates the user name and email. Changing the email will reset the verification status and trigger a new verification link.',
+        security: [['bearerAuth' => []]],
+        tags: ['User']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['name', 'email'],
+            properties: [
+                new OA\Property(property: 'name', type: 'string', example: 'Jane Doe'),
+                new OA\Property(property: 'email', type: 'string', format: 'email', example: 'jane@example.com'),
+            ]
+        )
+    )]
+    #[OA\Response(response: 200, description: 'Profile updated successfully')]
+    #[OA\Response(response: 422, description: 'Validation errors (e.g., email already taken)')]
+    #[OA\Response(response: 401, description: 'Unauthenticated')]
+    public function updateProfile(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email,'.$user->id],
+        ]);
+
+        $emailChanged = $validated['email'] !== $user->email;
+
+        $user->forceFill([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+        ]);
+
+        if ($emailChanged) {
+            $user->email_verified_at = null;
+            $user->sendEmailVerificationNotification();
+        }
+
+        $user->save();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => $emailChanged ? 'Profile updated. Please verify your new email.' : 'Profile updated.',
+            'data' => new UserResource($user),
         ]);
     }
 

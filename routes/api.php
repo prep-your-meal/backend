@@ -9,6 +9,8 @@ use App\Http\Controllers\Api\RecipeController;
 use App\Http\Controllers\Api\ShoppingListController;
 use App\Http\Controllers\Api\UserPreferenceController;
 use App\Http\Controllers\Api\WebhookController;
+use Illuminate\Foundation\Auth\EmailVerificationRequest;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // --- Public Routes ---
@@ -20,6 +22,16 @@ Route::middleware('throttle:5,1')->group(function () {
     Route::post('/auth/forgot-password', [AuthController::class, 'sendResetLinkEmail'])->name('password.email');
     Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->name('password.reset');
 });
+
+// Email Verification (Publicly accessible as the link comes from an email)
+Route::get('/email/verify/{id}/{hash}', function (EmailVerificationRequest $request) {
+    $request->fulfill(); // Verifies the user in the database
+
+    // Redirects the user back to the Vue PWA (e.g., to a success page)
+    $frontendUrl = config('app.frontend_url', 'http://localhost:5173');
+
+    return redirect()->to("{$frontendUrl}/login?verified=1");
+})->middleware(['signed'])->name('verification.verify');
 
 // Socialite OAuth
 Route::get('/auth/{provider}/redirect', [AuthController::class, 'redirectToProvider']);
@@ -84,6 +96,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/', [AuthController::class, 'destroy']);
         Route::get('/preferences', [UserPreferenceController::class, 'show'])->name('user.preferences.show');
         Route::put('/preferences', [UserPreferenceController::class, 'update'])->name('user.preferences.update');
+
+        // Profile Management & Email Verification
+        Route::put('/profile', [AuthController::class, 'updateProfile']);
+        Route::post('/email/verification-notification', function (Request $request) {
+            $request->user()->sendEmailVerificationNotification();
+
+            return response()->json(['status' => 'success', 'message' => 'Verification link sent!']);
+        })->middleware(['throttle:6,1']);
     });
 
     // Meal Plan
