@@ -9,7 +9,8 @@ use App\Http\Controllers\Api\RecipeController;
 use App\Http\Controllers\Api\ShoppingListController;
 use App\Http\Controllers\Api\UserPreferenceController;
 use App\Http\Controllers\Api\WebhookController;
-use Illuminate\Foundation\Auth\EmailVerificationRequest;
+use App\Models\User;
+use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -23,12 +24,20 @@ Route::middleware('throttle:5,1')->group(function () {
     Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->name('password.reset');
 });
 
-// Email Verification (Publicly accessible as the link comes from an email)
-Route::get('/email/verify/{id}/{hash}', function (EmailVerificationRequest $request) {
-    $request->fulfill(); // Verifies the user in the database
+// Email Verification (Publicly accessible, manual user lookup for SPA/API flows)
+Route::get('/email/verify/{id}/{hash}', function (Request $request, $id, $hash) {
+    $user = User::findOrFail($id);
 
-    // Redirects the user back to the Vue PWA (e.g., to a success page)
-    $frontendUrl = config('app.frontend_url', 'http://localhost:5173');
+    if (! hash_equals((string) $hash, sha1($user->getEmailForVerification()))) {
+        abort(403, 'Invalid verification link.');
+    }
+
+    if (! $user->hasVerifiedEmail()) {
+        $user->markEmailAsVerified();
+        event(new Verified($user));
+    }
+
+    $frontendUrl = config('app.frontend_url', 'http://localhost:5174');
 
     return redirect()->to("{$frontendUrl}/login?verified=1");
 })->middleware(['signed'])->name('verification.verify');

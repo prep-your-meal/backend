@@ -119,7 +119,7 @@ For all features to work, ensure the following keys are set in your `.env` file:
 
 ```dotenv
 # Frontend URL (Used for OAuth redirects)
-FRONTEND_URL=http://localhost:5173
+FRONTEND_URL=http://localhost:5174
 
 # GitHub OAuth
 GITHUB_CLIENT_ID=your_github_client_id
