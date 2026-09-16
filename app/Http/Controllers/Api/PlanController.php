@@ -10,7 +10,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use OpenApi\Attributes as OA;
@@ -31,13 +30,13 @@ class PlanController extends Controller
             $userId = $request->user()->id;
             $locale = $request->getPreferredLanguage(['en', 'de']);
 
-            $currentPlan = Cache::remember("meal_plan_user_{$userId}", now()->endOfWeek(), function () use ($userId, $today) {
-                return MealPlan::with(['recipe.ingredients'])
-                    ->where('user_id', $userId)
-                    ->where('scheduled_for', '>=', $today)
-                    ->orderBy('scheduled_for', 'asc')
-                    ->get();
-            });
+            // Fetch directly from DB. Caching Eloquent collections often causes unserialize() errors,
+            // and since this query is lightweight and user-specific, a direct query is faster and safer.
+            $currentPlan = MealPlan::with(['recipe.ingredients'])
+                ->where('user_id', $userId)
+                ->where('scheduled_for', '>=', $today)
+                ->orderBy('scheduled_for', 'asc')
+                ->get();
 
             if ($currentPlan->isEmpty()) {
                 return response()->json([
@@ -180,7 +179,6 @@ class PlanController extends Controller
             }
 
             DB::commit();
-            Cache::forget("meal_plan_user_{$userId}");
 
             return response()->json([
                 'status' => 'success',
@@ -246,7 +244,6 @@ class PlanController extends Controller
         $newRecipe = $availableRecipes->random();
 
         $mealPlan->update(['recipe_slug' => $newRecipe->slug]);
-        Cache::forget("meal_plan_user_{$user->id}");
 
         $mealPlan->load('recipe.ingredients');
         $responseData = $mealPlan->toArray();
@@ -299,8 +296,6 @@ class PlanController extends Controller
             ['recipe_slug' => $request->recipe_slug, 'portions' => $defaultPortions]
         );
 
-        Cache::forget("meal_plan_user_{$user->id}");
-
         $mealPlan->load('recipe.ingredients');
         $responseData = $mealPlan->toArray();
 
@@ -331,13 +326,9 @@ class PlanController extends Controller
     {
         $user = $request->user();
 
-        $deleted = MealPlan::where('user_id', $user->id)
+        MealPlan::where('user_id', $user->id)
             ->where('scheduled_for', $date)
             ->delete();
-
-        if ($deleted) {
-            Cache::forget("meal_plan_user_{$user->id}");
-        }
 
         return response()->json([
             'status' => 'success',
