@@ -28,10 +28,7 @@ class PlanController extends Controller
         try {
             $today = Carbon::today();
             $userId = $request->user()->id;
-            $locale = $request->getPreferredLanguage(['en', 'de']);
 
-            // Fetch directly from DB. Caching Eloquent collections often causes unserialize() errors,
-            // and since this query is lightweight and user-specific, a direct query is faster and safer.
             $currentPlan = MealPlan::with(['recipe.ingredients'])
                 ->where('user_id', $userId)
                 ->where('scheduled_for', '>=', $today)
@@ -46,16 +43,11 @@ class PlanController extends Controller
                 ]);
             }
 
-            // Format the plan data to map the nested recipe through the RecipeResource
-            $formattedPlan = $currentPlan->map(function ($plan) use ($locale) {
+            $formattedPlan = $currentPlan->map(function ($plan) {
                 $planData = $plan->toArray();
 
                 if ($plan->recipe) {
-                    /** @var Recipe $recipe */
-                    $recipe = $plan->recipe;
-                    $clonedRecipe = clone $recipe;
-                    $clonedRecipe->title = $clonedRecipe->title[$locale] ?? $clonedRecipe->title['en'] ?? $clonedRecipe->slug;
-                    $planData['recipe'] = new RecipeResource($clonedRecipe);
+                    $planData['recipe'] = new RecipeResource($plan->recipe);
                 }
 
                 return $planData;
@@ -79,28 +71,22 @@ class PlanController extends Controller
     #[OA\Post(
         path: '/plan/generate',
         summary: 'Generate a smart meal plan based on preferences',
-        description: 'Generates a meal plan minimizing food waste via overlapping ingredients, respects user preferences, and avoids repeating meals from the last 30 days.',
+        description: 'Generates a meal plan minimizing food waste via overlapping ingredients.',
         security: [['bearerAuth' => []]],
         tags: ['Meal Plan']
     )]
-    #[OA\Response(response: 200, description: 'Generated meal plan')]
-    #[OA\Response(response: 400, description: 'Not enough available recipes')]
-    #[OA\Response(response: 500, description: 'Server error during generation')]
     public function generate(Request $request): JsonResponse
     {
         try {
             $user = $request->user();
             $userId = $user->id;
-            $locale = $request->getPreferredLanguage(['en', 'de']);
 
             $targetMeals = $user->target_meals_per_week ?? 7;
             $defaultPortions = $user->default_portions ?? 2;
 
-            // 1. Build query using our centralized preference logic
             $query = $this->buildPreferenceQuery($user);
             $availableRecipes = $query->get();
 
-            // 2. Fallback: Drop nice-to-have preferences, but KEEP strict allergy blacklist
             if ($availableRecipes->isEmpty()) {
                 $availableRecipes = $this->buildAllergyFallbackQuery($user)->get();
             }
@@ -112,13 +98,13 @@ class PlanController extends Controller
                 ], 400);
             }
 
-            // 3. Pick a random "Seed" recipe
-            /** @var Recipe $seedRecipe */
+            // Tell PHPStan exactly what $seedRecipe is
             $seedRecipe = $availableRecipes->random();
+            assert($seedRecipe instanceof Recipe);
+
             $selectedRecipes = collect([$seedRecipe]);
             $shouldMinimizeWaste = $user->minimize_food_waste ?? true;
 
-            // 4. Find overlapping ingredients to minimize food waste
             if ($shouldMinimizeWaste && $targetMeals > 1) {
                 $seedIngredientSlugs = DB::table('ingredient_recipe')
                     ->where('recipe_slug', $seedRecipe->slug)
@@ -140,7 +126,6 @@ class PlanController extends Controller
                 }
             }
 
-            // 5. Pad with random recipes if overlaps didn't yield enough meals
             if ($selectedRecipes->count() < $targetMeals) {
                 $needed = $targetMeals - $selectedRecipes->count();
                 $paddingRecipes = $availableRecipes
@@ -150,7 +135,6 @@ class PlanController extends Controller
                 $selectedRecipes = $selectedRecipes->merge($paddingRecipes);
             }
 
-            // 6. Save the generated plan
             DB::beginTransaction();
             MealPlan::where('user_id', $userId)->where('scheduled_for', '>=', Carbon::today())->delete();
 
@@ -158,7 +142,9 @@ class PlanController extends Controller
             $planResponse = [];
 
             foreach ($selectedRecipes as $index => $recipe) {
-                /** @var Recipe $recipe */
+                // Explicit assertion for PHPStan inside the loop
+                assert($recipe instanceof Recipe);
+
                 $scheduledDate = $startDate->copy()->addDays($index);
 
                 MealPlan::create([
@@ -168,13 +154,9 @@ class PlanController extends Controller
                     'portions' => $defaultPortions,
                 ]);
 
-                // Localize title and format resource for the response
-                $clonedRecipe = clone $recipe;
-                $clonedRecipe->title = $clonedRecipe->title[$locale] ?? $clonedRecipe->title['en'] ?? $clonedRecipe->slug;
-
                 $planResponse[] = [
                     'date' => $scheduledDate->format('Y-m-d'),
-                    'recipe' => new RecipeResource($clonedRecipe),
+                    'recipe' => new RecipeResource($recipe),
                 ];
             }
 
@@ -203,13 +185,9 @@ class PlanController extends Controller
         security: [['bearerAuth' => []]],
         tags: ['Meal Plan']
     )]
-    #[OA\Response(response: 200, description: 'Meal successfully swapped')]
-    #[OA\Response(response: 400, description: 'No alternative recipes available')]
-    #[OA\Response(response: 404, description: 'No meal scheduled for this date')]
     public function swap(Request $request, string $date): JsonResponse
     {
         $user = $request->user();
-        $locale = $request->getPreferredLanguage(['en', 'de']);
 
         $mealPlan = MealPlan::where('user_id', $user->id)
             ->where('scheduled_for', $date)
@@ -224,7 +202,6 @@ class PlanController extends Controller
 
         $query = $this->buildPreferenceQuery($user);
         $query->where('slug', '!=', $mealPlan->recipe_slug);
-
         $availableRecipes = $query->get();
 
         if ($availableRecipes->isEmpty()) {
@@ -240,21 +217,17 @@ class PlanController extends Controller
             ], 400);
         }
 
-        /** @var Recipe $newRecipe */
         $newRecipe = $availableRecipes->random();
+        // Explicit assertion for PHPStan
+        assert($newRecipe instanceof Recipe);
 
         $mealPlan->update(['recipe_slug' => $newRecipe->slug]);
 
         $mealPlan->load('recipe.ingredients');
         $responseData = $mealPlan->toArray();
 
-        // Format resource for response
         if ($mealPlan->recipe) {
-            /** @var Recipe $recipe */
-            $recipe = $mealPlan->recipe;
-            $clonedRecipe = clone $recipe;
-            $clonedRecipe->title = $clonedRecipe->title[$locale] ?? $clonedRecipe->title['en'] ?? $clonedRecipe->slug;
-            $responseData['recipe'] = new RecipeResource($clonedRecipe);
+            $responseData['recipe'] = new RecipeResource($mealPlan->recipe);
         }
 
         return response()->json([
@@ -270,16 +243,6 @@ class PlanController extends Controller
         security: [['bearerAuth' => []]],
         tags: ['Meal Plan']
     )]
-    #[OA\RequestBody(
-        required: true,
-        content: new OA\JsonContent(
-            required: ['recipe_slug'],
-            properties: [
-                new OA\Property(property: 'recipe_slug', type: 'string', example: 'chicken-curry'),
-            ]
-        )
-    )]
-    #[OA\Response(response: 200, description: 'Recipe manually added to plan')]
     public function addManual(Request $request, string $date): JsonResponse
     {
         $request->validate([
@@ -288,9 +251,7 @@ class PlanController extends Controller
 
         $user = $request->user();
         $defaultPortions = $user->default_portions ?? 2;
-        $locale = $request->getPreferredLanguage(['en', 'de']);
 
-        // Use updateOrCreate so if a meal already exists for this date, it gets overwritten
         $mealPlan = MealPlan::updateOrCreate(
             ['user_id' => $user->id, 'scheduled_for' => $date],
             ['recipe_slug' => $request->recipe_slug, 'portions' => $defaultPortions]
@@ -299,13 +260,8 @@ class PlanController extends Controller
         $mealPlan->load('recipe.ingredients');
         $responseData = $mealPlan->toArray();
 
-        // Format resource for response
         if ($mealPlan->recipe) {
-            /** @var Recipe $recipe */
-            $recipe = $mealPlan->recipe;
-            $clonedRecipe = clone $recipe;
-            $clonedRecipe->title = $clonedRecipe->title[$locale] ?? $clonedRecipe->title['en'] ?? $clonedRecipe->slug;
-            $responseData['recipe'] = new RecipeResource($clonedRecipe);
+            $responseData['recipe'] = new RecipeResource($mealPlan->recipe);
         }
 
         return response()->json([
@@ -321,12 +277,9 @@ class PlanController extends Controller
         security: [['bearerAuth' => []]],
         tags: ['Meal Plan']
     )]
-    #[OA\Response(response: 200, description: 'Meal removed from plan')]
     public function clearDate(Request $request, string $date): JsonResponse
     {
-        $user = $request->user();
-
-        MealPlan::where('user_id', $user->id)
+        MealPlan::where('user_id', $request->user()->id)
             ->where('scheduled_for', $date)
             ->delete();
 
@@ -336,9 +289,6 @@ class PlanController extends Controller
         ]);
     }
 
-    /**
-     * Reusable query builder for strict user preferences and 30-day rule.
-     */
     private function buildPreferenceQuery($user): Builder
     {
         $thirtyDaysAgo = Carbon::now()->subDays(30);
@@ -388,9 +338,6 @@ class PlanController extends Controller
         return $query;
     }
 
-    /**
-     * Reusable fallback query that ONLY respects the allergy blacklist.
-     */
     private function buildAllergyFallbackQuery($user): Builder
     {
         $query = Recipe::with('ingredients');
