@@ -35,7 +35,6 @@ class PlanController extends Controller
 
             $userId = $request->user()->id;
 
-            // Standardmäßig die aktuelle Woche (Montag bis Sonntag) laden, falls nichts übergeben wird
             $startDate = $request->query('start_date', Carbon::now()->startOfWeek()->format('Y-m-d'));
             $endDate = $request->query('end_date', Carbon::now()->endOfWeek()->format('Y-m-d'));
 
@@ -81,9 +80,17 @@ class PlanController extends Controller
     #[OA\Post(
         path: '/plan/generate',
         summary: 'Generate a smart meal plan based on preferences',
-        description: 'Generates a meal plan minimizing food waste via overlapping ingredients.',
+        description: 'Generates a meal plan minimizing food waste via overlapping ingredients. Optionally accepts a start_date to plan for future weeks.',
         security: [['bearerAuth' => []]],
         tags: ['Meal Plan']
+    )]
+    #[OA\RequestBody(
+        required: false,
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'start_date', type: 'string', format: 'date', example: '2026-09-21'),
+            ]
+        )
     )]
     #[OA\Response(response: 200, description: 'Generated meal plan')]
     #[OA\Response(response: 400, description: 'Not enough available recipes')]
@@ -91,11 +98,20 @@ class PlanController extends Controller
     public function generate(Request $request): JsonResponse
     {
         try {
+            $request->validate([
+                'start_date' => 'nullable|date',
+            ]);
+
             $user = $request->user();
             $userId = $user->id;
 
             $targetMeals = $user->target_meals_per_week ?? 7;
             $defaultPortions = $user->default_portions ?? 2;
+
+            // Nutze das übergebene Datum oder falle auf heute zurück
+            $startDate = $request->input('start_date')
+                ? Carbon::parse($request->input('start_date'))
+                : Carbon::today();
 
             $availableRecipeSlugs = $this->buildPreferenceQuery($user)->pluck('slug');
 
@@ -159,9 +175,14 @@ class PlanController extends Controller
                 })->values();
 
             DB::beginTransaction();
-            MealPlan::where('user_id', $userId)->where('scheduled_for', '>=', Carbon::today())->delete();
 
-            $startDate = Carbon::today();
+            // LÖSCHE NUR DIE TAGE, DIE WIR GERADE ÜBERSCHREIBEN
+            // (statt stur alles ab heute zu löschen)
+            $endDate = $startDate->copy()->addDays($targetMeals - 1);
+            MealPlan::where('user_id', $userId)
+                ->whereBetween('scheduled_for', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                ->delete();
+
             $planResponse = [];
 
             foreach ($selectedRecipes as $index => $recipe) {
