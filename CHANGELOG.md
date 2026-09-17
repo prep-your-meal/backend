@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.12.0](https://github.com/prep-your-meal/backend/compare/v1.11.7...v1.12.0) (2026-09-17)
+
+
+### Features
+
+* **plan:** implement smart alternatives endpoint with food waste prioritization ([d56f31d](https://github.com/prep-your-meal/backend/commit/d56f31dec3c1ecaa5b8aef13d36311e4f8a33bb5))
+
+
+### Bug Fixes
+
+* **api:** remove problematic eloquent collection caching in PlanController ([3894513](https://github.com/prep-your-meal/backend/commit/3894513afafed12f5052b97b69a9429d9f46913c))
+* **api:** use RecipeResource to ensure proper title formatting in all planner responses ([742c052](https://github.com/prep-your-meal/backend/commit/742c0524ccfa48eb3ba515d21a6b8a0e472f551d))
+
 ## [1.11.7](https://github.com/prep-your-meal/backend/compare/v1.11.6...v1.11.7) (2026-09-11)
 
 
