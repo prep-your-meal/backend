@@ -86,6 +86,20 @@ class PlanApiTest extends TestCase
         $this->assertStringStartsWith($nextWeekStart, $response->json('data.0.scheduled_for'));
     }
 
+    public function test_generate_plan_fails_if_not_enough_recipes_matching_requirements()
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user, ['*']);
+
+        $response = $this->postJson('/plan/generate');
+
+        $response->assertStatus(400)
+            ->assertJson([
+                'status' => 'error',
+                'message' => 'Not enough available recipes matching your strict dietary requirements.',
+            ]);
+    }
+
     public function test_successfully_generates_meal_plan_with_dynamic_default_portions()
     {
         $user = User::factory()->create(['default_portions' => 4]);
@@ -110,6 +124,71 @@ class PlanApiTest extends TestCase
         $this->assertArrayHasKey('ingredients', $firstMeal);
         $this->assertArrayHasKey('amount', $firstMeal['ingredients'][0]);
         $this->assertArrayNotHasKey('pivot', $firstMeal['ingredients'][0]);
+    }
+
+    public function test_generates_meal_plan_starting_from_provided_start_date()
+    {
+        $user = User::factory()->create(['target_meals_per_week' => 3]);
+        Sanctum::actingAs($user, ['*']);
+
+        Recipe::factory()->count(5)->create();
+
+        $futureDate = Carbon::today()->addDays(10)->format('Y-m-d');
+
+        $response = $this->postJson('/plan/generate', [
+            'start_date' => $futureDate,
+        ]);
+
+        $response->assertStatus(200);
+        $this->assertDatabaseCount('meal_plans', 3);
+
+        $this->assertDatabaseHas('meal_plans', [
+            'user_id' => $user->id,
+            'scheduled_for' => $futureDate,
+        ]);
+
+        $this->assertStringStartsWith($futureDate, $response->json('data.0.date'));
+    }
+
+    public function test_generate_plan_only_deletes_meals_within_the_target_generation_range()
+    {
+        $user = User::factory()->create(['target_meals_per_week' => 2]);
+        Sanctum::actingAs($user, ['*']);
+
+        $recipe = Recipe::factory()->create();
+        Recipe::factory()->count(5)->create();
+
+        // Existierender Plan fuer HEUTE (sollte bestehen bleiben)
+        $today = Carbon::today()->format('Y-m-d');
+        MealPlan::create([
+            'user_id' => $user->id,
+            'recipe_slug' => $recipe->slug,
+            'scheduled_for' => $today,
+            'portions' => 2,
+        ]);
+
+        // Generiere Plan fuer naechste Woche (2 Tage)
+        $futureDate = Carbon::today()->addDays(7)->format('Y-m-d');
+
+        $response = $this->postJson('/plan/generate', [
+            'start_date' => $futureDate,
+        ]);
+
+        $response->assertStatus(200);
+
+        // Der alte Plan fuer heute muss noch da sein
+        $this->assertDatabaseHas('meal_plans', [
+            'user_id' => $user->id,
+            'scheduled_for' => $today,
+        ]);
+
+        // Die neuen Plaene muessen da sein (Gesamt also 1 + 2 = 3 Eintraege)
+        $this->assertDatabaseCount('meal_plans', 3);
+
+        $this->assertDatabaseHas('meal_plans', [
+            'user_id' => $user->id,
+            'scheduled_for' => $futureDate,
+        ]);
     }
 
     public function test_respects_target_meals_per_week_preference()
