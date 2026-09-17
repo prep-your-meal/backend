@@ -382,4 +382,107 @@ class PlanApiTest extends TestCase
             'scheduled_for' => $date,
         ]);
     }
+
+    public function test_unauthenticated_user_cannot_access_alternatives()
+    {
+        $today = Carbon::today()->format('Y-m-d');
+        $response = $this->getJson("/plan/{$today}/alternatives");
+
+        $response->assertStatus(401);
+    }
+
+    public function test_user_can_retrieve_alternatives_for_a_date()
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user, ['*']);
+
+        $today = Carbon::today()->format('Y-m-d');
+
+        Recipe::factory()->count(3)
+            ->hasAttached(Ingredient::factory()->count(1), ['amount' => 100])
+            ->create();
+
+        $response = $this->getJson("/plan/{$today}/alternatives");
+
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'status',
+                'data' => [
+                    '*' => [
+                        'slug',
+                        'title',
+                        'ingredients',
+                    ],
+                ],
+            ]);
+
+        $this->assertCount(3, $response->json('data'));
+    }
+
+    public function test_alternatives_prioritizes_food_waste_reduction_when_enabled()
+    {
+        $user = User::factory()->create([
+            'minimize_food_waste' => true,
+        ]);
+        Sanctum::actingAs($user, ['*']);
+
+        $today = Carbon::today()->format('Y-m-d');
+        $tomorrow = Carbon::tomorrow()->format('Y-m-d');
+
+        $sharedIngredient = Ingredient::factory()->create(['slug' => 'avocado']);
+        $uniqueIngredient = Ingredient::factory()->create(['slug' => 'tofu']);
+
+        // Recipe already scheduled for today
+        $scheduledRecipe = Recipe::factory()->create(['slug' => 'scheduled-recipe']);
+        $scheduledRecipe->ingredients()->attach($sharedIngredient, ['amount' => 1]);
+
+        MealPlan::create([
+            'user_id' => $user->id,
+            'recipe_slug' => $scheduledRecipe->slug,
+            'scheduled_for' => $today,
+            'portions' => 2,
+        ]);
+
+        // Alternative 1: Shares avocado (food waste candidate)
+        $recipeWithOverlap = Recipe::factory()->create(['slug' => 'overlapping-salad']);
+        $recipeWithOverlap->ingredients()->attach($sharedIngredient, ['amount' => 1]);
+
+        // Alternative 2: No shared ingredients
+        $recipeWithoutOverlap = Recipe::factory()->create(['slug' => 'independent-stirfry']);
+        $recipeWithoutOverlap->ingredients()->attach($uniqueIngredient, ['amount' => 1]);
+
+        $response = $this->getJson("/plan/{$tomorrow}/alternatives");
+
+        $response->assertStatus(200);
+
+        // Verify the overlapping recipe appears before the non-overlapping recipe
+        $firstRecommendationSlug = $response->json('data.0.slug');
+        $this->assertEquals('overlapping-salad', $firstRecommendationSlug);
+    }
+
+    public function test_alternatives_excludes_current_meal_on_target_date()
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user, ['*']);
+
+        $today = Carbon::today()->format('Y-m-d');
+
+        $currentMeal = Recipe::factory()->create(['slug' => 'current-scheduled-meal']);
+        $otherRecipe = Recipe::factory()->create(['slug' => 'alternative-meal']);
+
+        MealPlan::create([
+            'user_id' => $user->id,
+            'recipe_slug' => $currentMeal->slug,
+            'scheduled_for' => $today,
+            'portions' => 2,
+        ]);
+
+        $response = $this->getJson("/plan/{$today}/alternatives");
+
+        $response->assertStatus(200);
+
+        $returnedSlugs = collect($response->json('data'))->pluck('slug');
+        $this->assertFalse($returnedSlugs->contains('current-scheduled-meal'));
+        $this->assertTrue($returnedSlugs->contains('alternative-meal'));
+    }
 }

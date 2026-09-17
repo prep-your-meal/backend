@@ -289,6 +289,123 @@ class PlanController extends Controller
         ]);
     }
 
+    #[OA\Get(
+        path: '/plan/{date}/alternatives',
+        summary: 'Get smart recipe alternatives for a specific date',
+        description: 'Returns candidate recipes respecting dietary preferences, allergy blacklists, and prioritizing food-waste reduction via overlapping ingredients with current active meals.',
+        security: [['bearerAuth' => []]],
+        tags: ['Meal Plan']
+    )]
+    #[OA\Parameter(
+        name: 'date',
+        in: 'path',
+        required: true,
+        description: 'The target date in YYYY-MM-DD format',
+        schema: new OA\Schema(type: 'string', format: 'date', example: '2026-09-17')
+    )]
+    #[OA\Response(response: 200, description: 'List of alternative recipes')]
+    #[OA\Response(response: 401, description: 'Unauthenticated')]
+    public function alternatives(Request $request, string $date): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            // 1. Exclude the recipe currently planned for this specific date
+            $currentMealForDate = MealPlan::where('user_id', $user->id)
+                ->where('scheduled_for', $date)
+                ->value('recipe_slug');
+
+            // 2. Query available recipes respecting user preferences
+            $query = $this->buildPreferenceQuery($user);
+            if ($currentMealForDate) {
+                $query->where('slug', '!=', $currentMealForDate);
+            }
+
+            $availableRecipes = $query->get();
+
+            // Fallback to strict allergy check if preferences return no results
+            if ($availableRecipes->isEmpty()) {
+                $fallbackQuery = $this->buildAllergyFallbackQuery($user);
+                if ($currentMealForDate) {
+                    $fallbackQuery->where('slug', '!=', $currentMealForDate);
+                }
+                $availableRecipes = $fallbackQuery->get();
+            }
+
+            if ($availableRecipes->isEmpty()) {
+                return response()->json([
+                    'status' => 'success',
+                    'data' => [],
+                ]);
+            }
+
+            $shouldMinimizeWaste = $user->minimize_food_waste ?? true;
+            $rankedRecipes = collect();
+
+            if ($shouldMinimizeWaste) {
+                // Find all active scheduled recipes across the user's current plan (excluding current date)
+                $activePlanSlugs = MealPlan::where('user_id', $user->id)
+                    ->where('scheduled_for', '>=', Carbon::today())
+                    ->where('scheduled_for', '!=', $date)
+                    ->pluck('recipe_slug');
+
+                if ($activePlanSlugs->isNotEmpty()) {
+                    // Extract ingredients used in other scheduled meals
+                    $activeIngredientSlugs = DB::table('ingredient_recipe')
+                        ->whereIn('recipe_slug', $activePlanSlugs)
+                        ->pluck('ingredient_slug')
+                        ->unique();
+
+                    if ($activeIngredientSlugs->isNotEmpty()) {
+                        // Rank available candidate recipes by number of shared ingredients
+                        $rankedSlugs = DB::table('ingredient_recipe')
+                            ->select('recipe_slug', DB::raw('COUNT(ingredient_slug) as shared_count'))
+                            ->whereIn('ingredient_slug', $activeIngredientSlugs)
+                            ->whereIn('recipe_slug', $availableRecipes->pluck('slug'))
+                            ->groupBy('recipe_slug')
+                            ->orderByDesc('shared_count')
+                            ->pluck('recipe_slug');
+
+                        $rankedMap = array_flip($rankedSlugs->toArray());
+
+                        $wasteMinimizingRecipes = $availableRecipes
+                            ->whereIn('slug', $rankedSlugs)
+                            ->sortBy(function ($recipe) use ($rankedMap) {
+                                assert($recipe instanceof Recipe);
+
+                                return $rankedMap[$recipe->slug] ?? 9999;
+                            });
+
+                        $remainingRecipes = $availableRecipes
+                            ->whereNotIn('slug', $rankedSlugs)
+                            ->shuffle();
+
+                        $rankedRecipes = $wasteMinimizingRecipes->concat($remainingRecipes);
+                    }
+                }
+            }
+
+            if ($rankedRecipes->isEmpty()) {
+                $rankedRecipes = $availableRecipes->shuffle();
+            }
+
+            // Limit recommendations to top 15 candidates
+            $finalRecommendations = $rankedRecipes->take(15)->values();
+
+            return response()->json([
+                'status' => 'success',
+                'data' => RecipeResource::collection($finalRecommendations),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Meal Plan Alternatives Error: '.$e->getMessage());
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve alternative recipes.',
+            ], 500);
+        }
+    }
+
     private function buildPreferenceQuery($user): Builder
     {
         $thirtyDaysAgo = Carbon::now()->subDays(30);
