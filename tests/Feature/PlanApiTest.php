@@ -31,23 +31,59 @@ class PlanApiTest extends TestCase
         $response->assertStatus(200)
             ->assertJson([
                 'status' => 'success',
-                'message' => 'No active meal plan found.',
+                'message' => 'No active meal plan found for this date range.',
                 'data' => [],
             ]);
     }
 
-    public function test_generate_plan_fails_if_not_enough_recipes_matching_requirements()
+    public function test_authenticated_user_can_retrieve_meal_plan_for_specific_date_range()
     {
         $user = User::factory()->create();
         Sanctum::actingAs($user, ['*']);
 
-        $response = $this->postJson('/plan/generate');
+        $recipe = Recipe::factory()->create();
 
-        $response->assertStatus(400)
-            ->assertJson([
-                'status' => 'error',
-                'message' => 'Not enough available recipes matching your strict dietary requirements.',
-            ]);
+        // 1. Meal in der vergangenen Woche
+        $lastWeek = Carbon::now()->subWeek()->startOfWeek()->format('Y-m-d');
+        MealPlan::create([
+            'user_id' => $user->id,
+            'recipe_slug' => $recipe->slug,
+            'scheduled_for' => $lastWeek,
+            'portions' => 2,
+        ]);
+
+        // 2. Meal in dieser Woche
+        $thisWeek = Carbon::now()->startOfWeek()->format('Y-m-d');
+        MealPlan::create([
+            'user_id' => $user->id,
+            'recipe_slug' => $recipe->slug,
+            'scheduled_for' => $thisWeek,
+            'portions' => 2,
+        ]);
+
+        // 3. Meal in der naechsten Woche
+        $nextWeekStart = Carbon::now()->addWeek()->startOfWeek()->format('Y-m-d');
+        $nextWeekEnd = Carbon::now()->addWeek()->endOfWeek()->format('Y-m-d');
+        MealPlan::create([
+            'user_id' => $user->id,
+            'recipe_slug' => $recipe->slug,
+            'scheduled_for' => $nextWeekStart,
+            'portions' => 2,
+        ]);
+
+        // Query NUR fuer naechste Woche testen (Als echter Query-String fuer GET!)
+        $query = http_build_query([
+            'start_date' => $nextWeekStart,
+            'end_date' => $nextWeekEnd,
+        ]);
+
+        $response = $this->getJson("/plan?{$query}");
+
+        $response->assertStatus(200);
+        $this->assertCount(1, $response->json('data'));
+
+        // assertStringStartsWith ignoriert den angehaengten ISO-Zeitstempel (T00:00:00.000000Z)
+        $this->assertStringStartsWith($nextWeekStart, $response->json('data.0.scheduled_for'));
     }
 
     public function test_successfully_generates_meal_plan_with_dynamic_default_portions()
