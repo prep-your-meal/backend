@@ -18,27 +18,37 @@ class PlanController extends Controller
 {
     #[OA\Get(
         path: '/plan',
-        summary: 'Get the currently active meal plan',
+        summary: 'Get the meal plan for a specific date range',
         security: [['bearerAuth' => []]],
         tags: ['Meal Plan']
     )]
-    #[OA\Response(response: 200, description: 'Current meal plan data')]
+    #[OA\Parameter(name: 'start_date', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date'))]
+    #[OA\Parameter(name: 'end_date', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date'))]
+    #[OA\Response(response: 200, description: 'Meal plan data for the requested date range')]
     public function current(Request $request): JsonResponse
     {
         try {
-            $today = Carbon::today();
+            $request->validate([
+                'start_date' => 'nullable|date',
+                'end_date' => 'nullable|date|after_or_equal:start_date',
+            ]);
+
             $userId = $request->user()->id;
+
+            // Standardmäßig die aktuelle Woche (Montag bis Sonntag) laden, falls nichts übergeben wird
+            $startDate = $request->query('start_date', Carbon::now()->startOfWeek()->format('Y-m-d'));
+            $endDate = $request->query('end_date', Carbon::now()->endOfWeek()->format('Y-m-d'));
 
             $currentPlan = MealPlan::with(['recipe.ingredients'])
                 ->where('user_id', $userId)
-                ->where('scheduled_for', '>=', $today)
+                ->whereBetween('scheduled_for', [$startDate, $endDate])
                 ->orderBy('scheduled_for', 'asc')
                 ->get();
 
             if ($currentPlan->isEmpty()) {
                 return response()->json([
                     'status' => 'success',
-                    'message' => 'No active meal plan found.',
+                    'message' => 'No active meal plan found for this date range.',
                     'data' => [],
                 ]);
             }
@@ -63,7 +73,7 @@ class PlanController extends Controller
 
             return response()->json([
                 'status' => 'error',
-                'message' => 'Failed to retrieve the current meal plan.',
+                'message' => 'Failed to retrieve the meal plan.',
             ], 500);
         }
     }
