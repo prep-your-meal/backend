@@ -75,6 +75,9 @@ class PlanController extends Controller
         security: [['bearerAuth' => []]],
         tags: ['Meal Plan']
     )]
+    #[OA\Response(response: 200, description: 'Generated meal plan')]
+    #[OA\Response(response: 400, description: 'Not enough available recipes')]
+    #[OA\Response(response: 500, description: 'Server error during generation')]
     public function generate(Request $request): JsonResponse
     {
         try {
@@ -84,56 +87,66 @@ class PlanController extends Controller
             $targetMeals = $user->target_meals_per_week ?? 7;
             $defaultPortions = $user->default_portions ?? 2;
 
-            $query = $this->buildPreferenceQuery($user);
-            $availableRecipes = $query->get();
+            $availableRecipeSlugs = $this->buildPreferenceQuery($user)->pluck('slug');
 
-            if ($availableRecipes->isEmpty()) {
-                $availableRecipes = $this->buildAllergyFallbackQuery($user)->get();
+            if ($availableRecipeSlugs->isEmpty()) {
+                $availableRecipeSlugs = $this->buildAllergyFallbackQuery($user)->pluck('slug');
             }
 
-            if ($availableRecipes->isEmpty()) {
+            if ($availableRecipeSlugs->isEmpty()) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Not enough available recipes matching your strict dietary requirements.',
                 ], 400);
             }
 
-            // Tell PHPStan exactly what $seedRecipe is
-            $seedRecipe = $availableRecipes->random();
-            assert($seedRecipe instanceof Recipe);
+            // Using firstOrFail() natively informs PHPStan that this will return a valid Model, not null
+            $seedRecipe = Recipe::with('ingredients')
+                ->whereIn('slug', $availableRecipeSlugs)
+                ->inRandomOrder()
+                ->firstOrFail();
 
-            $selectedRecipes = collect([$seedRecipe]);
+            $selectedSlugs = collect([$seedRecipe->slug]);
             $shouldMinimizeWaste = $user->minimize_food_waste ?? true;
 
             if ($shouldMinimizeWaste && $targetMeals > 1) {
                 $seedIngredientSlugs = DB::table('ingredient_recipe')
-                    ->where('recipe_slug', $seedRecipe->slug)
-                    ->pluck('ingredient_slug');
+                    ->join('ingredients', 'ingredient_recipe.ingredient_slug', '=', 'ingredients.slug')
+                    ->where('ingredient_recipe.recipe_slug', $seedRecipe->slug)
+                    ->where('ingredients.is_pantry_item', false)
+                    ->pluck('ingredient_recipe.ingredient_slug');
 
                 $overlappingSlugs = DB::table('ingredient_recipe')
-                    ->select('recipe_slug', DB::raw('COUNT(ingredient_slug) as shared_count'))
-                    ->whereIn('ingredient_slug', $seedIngredientSlugs)
-                    ->where('recipe_slug', '!=', $seedRecipe->slug)
-                    ->whereIn('recipe_slug', $availableRecipes->pluck('slug'))
-                    ->groupBy('recipe_slug')
+                    ->select('ingredient_recipe.recipe_slug', DB::raw('COUNT(ingredient_recipe.ingredient_slug) as shared_count'))
+                    ->whereIn('ingredient_recipe.ingredient_slug', $seedIngredientSlugs)
+                    ->where('ingredient_recipe.recipe_slug', '!=', $seedRecipe->slug)
+                    ->whereIn('ingredient_recipe.recipe_slug', $availableRecipeSlugs)
+                    ->groupBy('ingredient_recipe.recipe_slug')
                     ->orderByDesc('shared_count')
                     ->limit($targetMeals - 1)
-                    ->pluck('recipe_slug');
+                    ->pluck('ingredient_recipe.recipe_slug');
 
-                if ($overlappingSlugs->isNotEmpty()) {
-                    $overlappingRecipes = Recipe::with('ingredients')->whereIn('slug', $overlappingSlugs)->get();
-                    $selectedRecipes = $selectedRecipes->merge($overlappingRecipes);
-                }
+                $selectedSlugs = $selectedSlugs->concat($overlappingSlugs);
             }
 
-            if ($selectedRecipes->count() < $targetMeals) {
-                $needed = $targetMeals - $selectedRecipes->count();
-                $paddingRecipes = $availableRecipes
-                    ->whereNotIn('slug', $selectedRecipes->pluck('slug'))
-                    ->random(min($needed, $availableRecipes->count() - $selectedRecipes->count()));
+            if ($selectedSlugs->count() < $targetMeals) {
+                $needed = $targetMeals - $selectedSlugs->count();
 
-                $selectedRecipes = $selectedRecipes->merge($paddingRecipes);
+                $paddingSlugs = Recipe::whereIn('slug', $availableRecipeSlugs)
+                    ->whereNotIn('slug', $selectedSlugs)
+                    ->inRandomOrder()
+                    ->limit($needed)
+                    ->pluck('slug');
+
+                $selectedSlugs = $selectedSlugs->concat($paddingSlugs);
             }
+
+            $selectedRecipes = Recipe::with('ingredients')
+                ->whereIn('slug', $selectedSlugs)
+                ->get()
+                ->sortBy(function ($recipe) use ($selectedSlugs) {
+                    return $selectedSlugs->search($recipe->slug);
+                })->values();
 
             DB::beginTransaction();
             MealPlan::where('user_id', $userId)->where('scheduled_for', '>=', Carbon::today())->delete();
@@ -142,9 +155,6 @@ class PlanController extends Controller
             $planResponse = [];
 
             foreach ($selectedRecipes as $index => $recipe) {
-                // Explicit assertion for PHPStan inside the loop
-                assert($recipe instanceof Recipe);
-
                 $scheduledDate = $startDate->copy()->addDays($index);
 
                 MealPlan::create([
@@ -185,6 +195,23 @@ class PlanController extends Controller
         security: [['bearerAuth' => []]],
         tags: ['Meal Plan']
     )]
+    #[OA\Parameter(
+        name: 'date',
+        in: 'path',
+        required: true,
+        description: 'The target date in YYYY-MM-DD format',
+        schema: new OA\Schema(type: 'string', format: 'date', example: '2026-09-17')
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['recipe_slug'],
+            properties: [
+                new OA\Property(property: 'recipe_slug', type: 'string', example: 'chicken-curry'),
+            ]
+        )
+    )]
+    #[OA\Response(response: 200, description: 'Recipe manually added or swapped')]
     public function addManual(Request $request, string $date): JsonResponse
     {
         $request->validate([
@@ -219,6 +246,14 @@ class PlanController extends Controller
         security: [['bearerAuth' => []]],
         tags: ['Meal Plan']
     )]
+    #[OA\Parameter(
+        name: 'date',
+        in: 'path',
+        required: true,
+        description: 'The target date in YYYY-MM-DD format',
+        schema: new OA\Schema(type: 'string', format: 'date', example: '2026-09-17')
+    )]
+    #[OA\Response(response: 200, description: 'Meal removed from plan')]
     public function clearDate(Request $request, string $date): JsonResponse
     {
         MealPlan::where('user_id', $request->user()->id)
@@ -234,10 +269,19 @@ class PlanController extends Controller
     #[OA\Get(
         path: '/plan/{date}/alternatives',
         summary: 'Get smart recipe alternatives for a specific date',
-        description: 'Returns candidate recipes respecting dietary preferences, allergy blacklists, and prioritizing food-waste reduction.',
+        description: 'Returns candidate recipes respecting dietary preferences, allergy blacklists, and prioritizing food-waste reduction via overlapping ingredients with current active meals.',
         security: [['bearerAuth' => []]],
         tags: ['Meal Plan']
     )]
+    #[OA\Parameter(
+        name: 'date',
+        in: 'path',
+        required: true,
+        description: 'The target date in YYYY-MM-DD format',
+        schema: new OA\Schema(type: 'string', format: 'date', example: '2026-09-17')
+    )]
+    #[OA\Response(response: 200, description: 'List of alternative recipes')]
+    #[OA\Response(response: 401, description: 'Unauthenticated')]
     public function alternatives(Request $request, string $date): JsonResponse
     {
         try {
@@ -252,17 +296,17 @@ class PlanController extends Controller
                 $query->where('slug', '!=', $currentMealForDate);
             }
 
-            $availableRecipes = $query->get();
+            $availableRecipeSlugs = $query->pluck('slug');
 
-            if ($availableRecipes->isEmpty()) {
+            if ($availableRecipeSlugs->isEmpty()) {
                 $fallbackQuery = $this->buildAllergyFallbackQuery($user);
                 if ($currentMealForDate) {
                     $fallbackQuery->where('slug', '!=', $currentMealForDate);
                 }
-                $availableRecipes = $fallbackQuery->get();
+                $availableRecipeSlugs = $fallbackQuery->pluck('slug');
             }
 
-            if ($availableRecipes->isEmpty()) {
+            if ($availableRecipeSlugs->isEmpty()) {
                 return response()->json([
                     'status' => 'success',
                     'data' => [],
@@ -270,7 +314,7 @@ class PlanController extends Controller
             }
 
             $shouldMinimizeWaste = $user->minimize_food_waste ?? true;
-            $rankedRecipes = collect();
+            $rankedSlugs = collect();
 
             if ($shouldMinimizeWaste) {
                 $activePlanSlugs = MealPlan::where('user_id', $user->id)
@@ -280,43 +324,41 @@ class PlanController extends Controller
 
                 if ($activePlanSlugs->isNotEmpty()) {
                     $activeIngredientSlugs = DB::table('ingredient_recipe')
-                        ->whereIn('recipe_slug', $activePlanSlugs)
-                        ->pluck('ingredient_slug')
+                        ->join('ingredients', 'ingredient_recipe.ingredient_slug', '=', 'ingredients.slug')
+                        ->whereIn('ingredient_recipe.recipe_slug', $activePlanSlugs)
+                        ->where('ingredients.is_pantry_item', false)
+                        ->pluck('ingredient_recipe.ingredient_slug')
                         ->unique();
 
                     if ($activeIngredientSlugs->isNotEmpty()) {
                         $rankedSlugs = DB::table('ingredient_recipe')
-                            ->select('recipe_slug', DB::raw('COUNT(ingredient_slug) as shared_count'))
-                            ->whereIn('ingredient_slug', $activeIngredientSlugs)
-                            ->whereIn('recipe_slug', $availableRecipes->pluck('slug'))
-                            ->groupBy('recipe_slug')
+                            ->select('ingredient_recipe.recipe_slug', DB::raw('COUNT(ingredient_recipe.ingredient_slug) as shared_count'))
+                            ->whereIn('ingredient_recipe.ingredient_slug', $activeIngredientSlugs)
+                            ->whereIn('ingredient_recipe.recipe_slug', $availableRecipeSlugs)
+                            ->groupBy('ingredient_recipe.recipe_slug')
                             ->orderByDesc('shared_count')
-                            ->pluck('recipe_slug');
-
-                        $rankedMap = array_flip($rankedSlugs->toArray());
-
-                        $wasteMinimizingRecipes = $availableRecipes
-                            ->whereIn('slug', $rankedSlugs)
-                            ->sortBy(function ($recipe) use ($rankedMap) {
-                                assert($recipe instanceof Recipe);
-
-                                return $rankedMap[$recipe->slug] ?? 9999;
-                            });
-
-                        $remainingRecipes = $availableRecipes
-                            ->whereNotIn('slug', $rankedSlugs)
-                            ->shuffle();
-
-                        $rankedRecipes = $wasteMinimizingRecipes->concat($remainingRecipes);
+                            ->pluck('ingredient_recipe.recipe_slug');
                     }
                 }
             }
 
-            if ($rankedRecipes->isEmpty()) {
-                $rankedRecipes = $availableRecipes->shuffle();
+            $neededRandom = 15 - $rankedSlugs->count();
+            $randomSlugs = collect();
+            if ($neededRandom > 0) {
+                $randomSlugs = collect($availableRecipeSlugs)
+                    ->reject(fn ($slug) => $rankedSlugs->contains($slug))
+                    ->shuffle()
+                    ->take($neededRandom);
             }
 
-            $finalRecommendations = $rankedRecipes->take(15)->values();
+            $finalSlugs = $rankedSlugs->concat($randomSlugs)->take(15);
+
+            $finalRecommendations = Recipe::with('ingredients')
+                ->whereIn('slug', $finalSlugs)
+                ->get()
+                ->sortBy(function ($recipe) use ($finalSlugs) {
+                    return $finalSlugs->search($recipe->slug);
+                })->values();
 
             return response()->json([
                 'status' => 'success',
@@ -336,7 +378,7 @@ class PlanController extends Controller
     {
         $thirtyDaysAgo = Carbon::now()->subDays(30);
 
-        $query = Recipe::with('ingredients')
+        $query = Recipe::query()
             ->whereNotIn('slug', function ($subQuery) use ($thirtyDaysAgo, $user) {
                 $subQuery->select('recipe_slug')
                     ->from('meal_plans')
@@ -383,7 +425,7 @@ class PlanController extends Controller
 
     private function buildAllergyFallbackQuery($user): Builder
     {
-        $query = Recipe::with('ingredients');
+        $query = Recipe::query();
 
         $allergies = array_filter((array) $user->allergies);
         if (! empty($allergies)) {
