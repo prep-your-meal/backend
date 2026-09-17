@@ -179,67 +179,9 @@ class PlanController extends Controller
         }
     }
 
-    #[OA\Put(
-        path: '/plan/{date}/swap',
-        summary: 'Swap a specific meal in the plan',
-        security: [['bearerAuth' => []]],
-        tags: ['Meal Plan']
-    )]
-    public function swap(Request $request, string $date): JsonResponse
-    {
-        $user = $request->user();
-
-        $mealPlan = MealPlan::where('user_id', $user->id)
-            ->where('scheduled_for', $date)
-            ->first();
-
-        if (! $mealPlan) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'No meal scheduled for this date.',
-            ], 404);
-        }
-
-        $query = $this->buildPreferenceQuery($user);
-        $query->where('slug', '!=', $mealPlan->recipe_slug);
-        $availableRecipes = $query->get();
-
-        if ($availableRecipes->isEmpty()) {
-            $fallbackQuery = $this->buildAllergyFallbackQuery($user);
-            $fallbackQuery->where('slug', '!=', $mealPlan->recipe_slug);
-            $availableRecipes = $fallbackQuery->get();
-        }
-
-        if ($availableRecipes->isEmpty()) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'No alternative recipes available.',
-            ], 400);
-        }
-
-        $newRecipe = $availableRecipes->random();
-        // Explicit assertion for PHPStan
-        assert($newRecipe instanceof Recipe);
-
-        $mealPlan->update(['recipe_slug' => $newRecipe->slug]);
-
-        $mealPlan->load('recipe.ingredients');
-        $responseData = $mealPlan->toArray();
-
-        if ($mealPlan->recipe) {
-            $responseData['recipe'] = new RecipeResource($mealPlan->recipe);
-        }
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Meal successfully swapped.',
-            'data' => $responseData,
-        ]);
-    }
-
     #[OA\Post(
         path: '/plan/{date}/add',
-        summary: 'Manually add a specific recipe to a date',
+        summary: 'Manually add or swap a specific recipe on a date',
         security: [['bearerAuth' => []]],
         tags: ['Meal Plan']
     )]
@@ -292,30 +234,19 @@ class PlanController extends Controller
     #[OA\Get(
         path: '/plan/{date}/alternatives',
         summary: 'Get smart recipe alternatives for a specific date',
-        description: 'Returns candidate recipes respecting dietary preferences, allergy blacklists, and prioritizing food-waste reduction via overlapping ingredients with current active meals.',
+        description: 'Returns candidate recipes respecting dietary preferences, allergy blacklists, and prioritizing food-waste reduction.',
         security: [['bearerAuth' => []]],
         tags: ['Meal Plan']
     )]
-    #[OA\Parameter(
-        name: 'date',
-        in: 'path',
-        required: true,
-        description: 'The target date in YYYY-MM-DD format',
-        schema: new OA\Schema(type: 'string', format: 'date', example: '2026-09-17')
-    )]
-    #[OA\Response(response: 200, description: 'List of alternative recipes')]
-    #[OA\Response(response: 401, description: 'Unauthenticated')]
     public function alternatives(Request $request, string $date): JsonResponse
     {
         try {
             $user = $request->user();
 
-            // 1. Exclude the recipe currently planned for this specific date
             $currentMealForDate = MealPlan::where('user_id', $user->id)
                 ->where('scheduled_for', $date)
                 ->value('recipe_slug');
 
-            // 2. Query available recipes respecting user preferences
             $query = $this->buildPreferenceQuery($user);
             if ($currentMealForDate) {
                 $query->where('slug', '!=', $currentMealForDate);
@@ -323,7 +254,6 @@ class PlanController extends Controller
 
             $availableRecipes = $query->get();
 
-            // Fallback to strict allergy check if preferences return no results
             if ($availableRecipes->isEmpty()) {
                 $fallbackQuery = $this->buildAllergyFallbackQuery($user);
                 if ($currentMealForDate) {
@@ -343,21 +273,18 @@ class PlanController extends Controller
             $rankedRecipes = collect();
 
             if ($shouldMinimizeWaste) {
-                // Find all active scheduled recipes across the user's current plan (excluding current date)
                 $activePlanSlugs = MealPlan::where('user_id', $user->id)
                     ->where('scheduled_for', '>=', Carbon::today())
                     ->where('scheduled_for', '!=', $date)
                     ->pluck('recipe_slug');
 
                 if ($activePlanSlugs->isNotEmpty()) {
-                    // Extract ingredients used in other scheduled meals
                     $activeIngredientSlugs = DB::table('ingredient_recipe')
                         ->whereIn('recipe_slug', $activePlanSlugs)
                         ->pluck('ingredient_slug')
                         ->unique();
 
                     if ($activeIngredientSlugs->isNotEmpty()) {
-                        // Rank available candidate recipes by number of shared ingredients
                         $rankedSlugs = DB::table('ingredient_recipe')
                             ->select('recipe_slug', DB::raw('COUNT(ingredient_slug) as shared_count'))
                             ->whereIn('ingredient_slug', $activeIngredientSlugs)
@@ -389,7 +316,6 @@ class PlanController extends Controller
                 $rankedRecipes = $availableRecipes->shuffle();
             }
 
-            // Limit recommendations to top 15 candidates
             $finalRecommendations = $rankedRecipes->take(15)->values();
 
             return response()->json([

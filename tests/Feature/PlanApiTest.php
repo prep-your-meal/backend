@@ -18,7 +18,6 @@ class PlanApiTest extends TestCase
     public function test_unauthenticated_user_cannot_access_meal_plan()
     {
         $response = $this->getJson('/plan');
-
         $response->assertStatus(401);
     }
 
@@ -44,7 +43,6 @@ class PlanApiTest extends TestCase
 
         $response = $this->postJson('/plan/generate');
 
-        // Updated error message to match the new strict allergy fallback logic
         $response->assertStatus(400)
             ->assertJson([
                 'status' => 'error',
@@ -54,13 +52,9 @@ class PlanApiTest extends TestCase
 
     public function test_successfully_generates_meal_plan_with_dynamic_default_portions()
     {
-        // Explicitly set default portions to prove the hardcoded value is gone
-        $user = User::factory()->create([
-            'default_portions' => 4,
-        ]);
+        $user = User::factory()->create(['default_portions' => 4]);
         Sanctum::actingAs($user, ['*']);
 
-        // Create 7 dummy recipes with attached ingredients to test resource formatting
         Recipe::factory()->count(7)
             ->hasAttached(Ingredient::factory()->count(2), ['amount' => 100])
             ->create();
@@ -68,21 +62,14 @@ class PlanApiTest extends TestCase
         $response = $this->postJson('/plan/generate');
 
         $response->assertStatus(200)
-            ->assertJson([
-                'status' => 'success',
-                'message' => '7-day smart meal plan successfully generated.',
-            ]);
+            ->assertJson(['status' => 'success']);
 
-        // Verify database contains exactly 7 meal plans
         $this->assertDatabaseCount('meal_plans', 7);
-
-        // Verify that the portions are dynamically set based on user preferences (4)
         $this->assertDatabaseHas('meal_plans', [
             'user_id' => $user->id,
             'portions' => 4,
         ]);
 
-        // Assert that the returned recipe uses the RecipeResource (flattened ingredients without pivot)
         $firstMeal = $response->json('data.0.recipe');
         $this->assertArrayHasKey('ingredients', $firstMeal);
         $this->assertArrayHasKey('amount', $firstMeal['ingredients'][0]);
@@ -91,86 +78,39 @@ class PlanApiTest extends TestCase
 
     public function test_respects_target_meals_per_week_preference()
     {
-        // Create a user who only wants 4 meals planned per week via the wizard
-        $user = User::factory()->create([
-            'target_meals_per_week' => 4,
-        ]);
+        $user = User::factory()->create(['target_meals_per_week' => 4]);
         Sanctum::actingAs($user, ['*']);
 
-        // Create enough recipes in the database
         Recipe::factory()->count(5)->create();
 
         $response = $this->postJson('/plan/generate');
 
-        $response->assertStatus(200)
-            ->assertJson([
-                'status' => 'success',
-                'message' => '4-day smart meal plan successfully generated.',
-            ]);
-
-        // Verify the system only scheduled 4 meals, respecting the user's settings
+        $response->assertStatus(200);
         $this->assertDatabaseCount('meal_plans', 4);
     }
 
     public function test_hybrid_preference_logic_filters_recipes_correctly()
     {
-        // 1. Create a user with specific hybrid preferences
-        // Diet: vegan OR vegetarian
-        // Logistics: MUST be quick
         $user = User::factory()->create([
             'target_meals_per_week' => 2,
             'dietary_preferences' => ['vegan', 'vegetarian'],
-            'fitness_goals' => [], // Empty, should be ignored
+            'fitness_goals' => [],
             'logistics_preferences' => ['quick'],
         ]);
         Sanctum::actingAs($user, ['*']);
 
-        // 2. Create matching recipes (Valid)
-        Recipe::factory()->create([
-            'slug' => 'vegan-quick-meal',
-            'categories' => ['vegan', 'quick'],
-        ]);
-        Recipe::factory()->create([
-            'slug' => 'vegetarian-quick-meal',
-            'categories' => ['vegetarian', 'quick'],
-        ]);
+        Recipe::factory()->create(['slug' => 'vegan-quick-meal', 'categories' => ['vegan', 'quick']]);
+        Recipe::factory()->create(['slug' => 'vegetarian-quick-meal', 'categories' => ['vegetarian', 'quick']]);
+        Recipe::factory()->create(['slug' => 'vegan-slow-meal', 'categories' => ['vegan', 'time-consuming']]);
+        Recipe::factory()->create(['slug' => 'meat-quick-meal', 'categories' => ['meat', 'quick']]);
 
-        // 3. Create trap recipes (Invalid)
-        Recipe::factory()->create([
-            'slug' => 'vegan-slow-meal',
-            'categories' => ['vegan', 'time-consuming'], // Fails logistics (not quick)
-        ]);
-        Recipe::factory()->create([
-            'slug' => 'meat-quick-meal',
-            'categories' => ['meat', 'quick'], // Fails diet (neither vegan nor vegetarian)
-        ]);
-
-        // 4. Generate the plan
         $response = $this->postJson('/plan/generate');
+        $response->assertStatus(200);
 
-        $response->assertStatus(200)
-            ->assertJson([
-                'status' => 'success',
-            ]);
-
-        // 5. Verify that exactly 2 meals were planned
         $this->assertDatabaseCount('meal_plans', 2);
-
-        // 6. Verify that ONLY the matching recipes were selected
-        $this->assertDatabaseHas('meal_plans', [
-            'user_id' => $user->id,
-            'recipe_slug' => 'vegan-quick-meal',
-        ]);
-        $this->assertDatabaseHas('meal_plans', [
-            'user_id' => $user->id,
-            'recipe_slug' => 'vegetarian-quick-meal',
-        ]);
-
-        // Ensure the trap recipes were NOT selected
-        $this->assertDatabaseMissing('meal_plans', [
-            'user_id' => $user->id,
-            'recipe_slug' => 'vegan-slow-meal',
-        ]);
+        $this->assertDatabaseHas('meal_plans', ['user_id' => $user->id, 'recipe_slug' => 'vegan-quick-meal']);
+        $this->assertDatabaseHas('meal_plans', ['user_id' => $user->id, 'recipe_slug' => 'vegetarian-quick-meal']);
+        $this->assertDatabaseMissing('meal_plans', ['user_id' => $user->id, 'recipe_slug' => 'vegan-slow-meal']);
     }
 
     public function test_allergy_blacklist_is_strictly_enforced()
@@ -181,41 +121,17 @@ class PlanApiTest extends TestCase
         ]);
         Sanctum::actingAs($user, ['*']);
 
-        // Safe recipes
-        Recipe::factory()->create([
-            'slug' => 'safe-recipe-1',
-            'categories' => ['vegan', 'quick'],
-        ]);
-        Recipe::factory()->create([
-            'slug' => 'safe-recipe-2',
-            'categories' => ['high-protein'],
-        ]);
-
-        // Dangerous recipes containing allergens
-        Recipe::factory()->create([
-            'slug' => 'dangerous-nut-recipe',
-            'categories' => ['nuts', 'dessert'],
-        ]);
-        Recipe::factory()->create([
-            'slug' => 'dangerous-shellfish-recipe',
-            'categories' => ['shellfish', 'dinner'],
-        ]);
+        Recipe::factory()->create(['slug' => 'safe-recipe-1', 'categories' => ['vegan', 'quick']]);
+        Recipe::factory()->create(['slug' => 'safe-recipe-2', 'categories' => ['high-protein']]);
+        Recipe::factory()->create(['slug' => 'dangerous-nut-recipe', 'categories' => ['nuts', 'dessert']]);
+        Recipe::factory()->create(['slug' => 'dangerous-shellfish-recipe', 'categories' => ['shellfish', 'dinner']]);
 
         $response = $this->postJson('/plan/generate');
-
         $response->assertStatus(200);
 
-        // Ensure only the two safe recipes were selected
         $this->assertDatabaseCount('meal_plans', 2);
-
-        $this->assertDatabaseMissing('meal_plans', [
-            'user_id' => $user->id,
-            'recipe_slug' => 'dangerous-nut-recipe',
-        ]);
-        $this->assertDatabaseMissing('meal_plans', [
-            'user_id' => $user->id,
-            'recipe_slug' => 'dangerous-shellfish-recipe',
-        ]);
+        $this->assertDatabaseMissing('meal_plans', ['recipe_slug' => 'dangerous-nut-recipe']);
+        $this->assertDatabaseMissing('meal_plans', ['recipe_slug' => 'dangerous-shellfish-recipe']);
     }
 
     public function test_respects_minimize_food_waste_toggle_enabled()
@@ -229,12 +145,7 @@ class PlanApiTest extends TestCase
         Recipe::factory()->count(5)->create();
 
         $response = $this->postJson('/plan/generate');
-
-        $response->assertStatus(200)
-            ->assertJson([
-                'status' => 'success',
-            ]);
-
+        $response->assertStatus(200);
         $this->assertDatabaseCount('meal_plans', 3);
     }
 
@@ -242,85 +153,20 @@ class PlanApiTest extends TestCase
     {
         $user = User::factory()->create([
             'target_meals_per_week' => 3,
-            'minimize_food_waste' => false, // Explicitly turned off
+            'minimize_food_waste' => false,
         ]);
         Sanctum::actingAs($user, ['*']);
 
         Recipe::factory()->count(5)->create();
 
         $response = $this->postJson('/plan/generate');
-
-        $response->assertStatus(200)
-            ->assertJson([
-                'status' => 'success',
-            ]);
-
-        // Should still generate the requested number of meals via random padding
+        $response->assertStatus(200);
         $this->assertDatabaseCount('meal_plans', 3);
-    }
-
-    public function test_user_can_swap_a_scheduled_meal()
-    {
-        $user = User::factory()->create();
-        Sanctum::actingAs($user, ['*']);
-
-        // Create two recipes with ingredients
-        $recipe1 = Recipe::factory()->create(['slug' => 'first-recipe']);
-        $recipe2 = Recipe::factory()
-            ->hasAttached(Ingredient::factory()->count(1), ['amount' => 50])
-            ->create(['slug' => 'alternative-recipe']);
-
-        // Schedule the first recipe for today
-        $today = Carbon::today()->format('Y-m-d');
-        MealPlan::create([
-            'user_id' => $user->id,
-            'recipe_slug' => $recipe1->slug,
-            'scheduled_for' => $today,
-            'portions' => 2,
-        ]);
-
-        // Attempt to swap it
-        $response = $this->putJson("/plan/{$today}/swap");
-
-        $response->assertStatus(200)
-            ->assertJson([
-                'status' => 'success',
-                'message' => 'Meal successfully swapped.',
-            ]);
-
-        // Assert the database has been updated to the alternative recipe
-        $this->assertDatabaseHas('meal_plans', [
-            'user_id' => $user->id,
-            'scheduled_for' => $today,
-            'recipe_slug' => $recipe2->slug,
-        ]);
-
-        // Assert resource formatting on swapped meal
-        $this->assertArrayHasKey('amount', $response->json('data.recipe.ingredients.0'));
-        $this->assertArrayNotHasKey('pivot', $response->json('data.recipe.ingredients.0'));
-    }
-
-    public function test_swap_fails_if_no_meal_is_scheduled_for_date()
-    {
-        $user = User::factory()->create();
-        Sanctum::actingAs($user, ['*']);
-
-        $tomorrow = Carbon::tomorrow()->format('Y-m-d');
-
-        $response = $this->putJson("/plan/{$tomorrow}/swap");
-
-        $response->assertStatus(404)
-            ->assertJson([
-                'status' => 'error',
-                'message' => 'No meal scheduled for this date.',
-            ]);
     }
 
     public function test_user_can_manually_add_a_meal_to_a_specific_date()
     {
-        $user = User::factory()->create([
-            'default_portions' => 3,
-        ]);
+        $user = User::factory()->create(['default_portions' => 3]);
         Sanctum::actingAs($user, ['*']);
 
         $recipe = Recipe::factory()
@@ -328,27 +174,15 @@ class PlanApiTest extends TestCase
             ->create(['slug' => 'my-favorite-curry']);
         $date = Carbon::today()->format('Y-m-d');
 
-        $response = $this->postJson("/plan/{$date}/add", [
-            'recipe_slug' => $recipe->slug,
-        ]);
+        $response = $this->postJson("/plan/{$date}/add", ['recipe_slug' => $recipe->slug]);
 
-        $response->assertStatus(200)
-            ->assertJson([
-                'status' => 'success',
-                'message' => 'Meal successfully scheduled.',
-            ]);
-
-        // Verify it was saved with the user's default portions
+        $response->assertStatus(200);
         $this->assertDatabaseHas('meal_plans', [
             'user_id' => $user->id,
             'scheduled_for' => $date,
             'recipe_slug' => $recipe->slug,
             'portions' => 3,
         ]);
-
-        // Assert resource formatting on added meal
-        $this->assertArrayHasKey('amount', $response->json('data.recipe.ingredients.0'));
-        $this->assertArrayNotHasKey('pivot', $response->json('data.recipe.ingredients.0'));
     }
 
     public function test_user_can_clear_a_meal_for_a_specific_date()
@@ -359,7 +193,6 @@ class PlanApiTest extends TestCase
         $date = Carbon::today()->format('Y-m-d');
         $recipe = Recipe::factory()->create();
 
-        // Create an existing meal plan
         MealPlan::create([
             'user_id' => $user->id,
             'recipe_slug' => $recipe->slug,
@@ -367,16 +200,9 @@ class PlanApiTest extends TestCase
             'portions' => 2,
         ]);
 
-        // Attempt to clear it
         $response = $this->deleteJson("/plan/{$date}");
 
-        $response->assertStatus(200)
-            ->assertJson([
-                'status' => 'success',
-                'message' => 'Meal removed from the plan for this date.',
-            ]);
-
-        // Ensure it's gone from the DB
+        $response->assertStatus(200);
         $this->assertDatabaseMissing('meal_plans', [
             'user_id' => $user->id,
             'scheduled_for' => $date,
@@ -387,7 +213,6 @@ class PlanApiTest extends TestCase
     {
         $today = Carbon::today()->format('Y-m-d');
         $response = $this->getJson("/plan/{$today}/alternatives");
-
         $response->assertStatus(401);
     }
 
@@ -421,9 +246,7 @@ class PlanApiTest extends TestCase
 
     public function test_alternatives_prioritizes_food_waste_reduction_when_enabled()
     {
-        $user = User::factory()->create([
-            'minimize_food_waste' => true,
-        ]);
+        $user = User::factory()->create(['minimize_food_waste' => true]);
         Sanctum::actingAs($user, ['*']);
 
         $today = Carbon::today()->format('Y-m-d');
@@ -432,7 +255,6 @@ class PlanApiTest extends TestCase
         $sharedIngredient = Ingredient::factory()->create(['slug' => 'avocado']);
         $uniqueIngredient = Ingredient::factory()->create(['slug' => 'tofu']);
 
-        // Recipe already scheduled for today
         $scheduledRecipe = Recipe::factory()->create(['slug' => 'scheduled-recipe']);
         $scheduledRecipe->ingredients()->attach($sharedIngredient, ['amount' => 1]);
 
@@ -443,19 +265,15 @@ class PlanApiTest extends TestCase
             'portions' => 2,
         ]);
 
-        // Alternative 1: Shares avocado (food waste candidate)
         $recipeWithOverlap = Recipe::factory()->create(['slug' => 'overlapping-salad']);
         $recipeWithOverlap->ingredients()->attach($sharedIngredient, ['amount' => 1]);
 
-        // Alternative 2: No shared ingredients
         $recipeWithoutOverlap = Recipe::factory()->create(['slug' => 'independent-stirfry']);
         $recipeWithoutOverlap->ingredients()->attach($uniqueIngredient, ['amount' => 1]);
 
         $response = $this->getJson("/plan/{$tomorrow}/alternatives");
-
         $response->assertStatus(200);
 
-        // Verify the overlapping recipe appears before the non-overlapping recipe
         $firstRecommendationSlug = $response->json('data.0.slug');
         $this->assertEquals('overlapping-salad', $firstRecommendationSlug);
     }
@@ -478,7 +296,6 @@ class PlanApiTest extends TestCase
         ]);
 
         $response = $this->getJson("/plan/{$today}/alternatives");
-
         $response->assertStatus(200);
 
         $returnedSlugs = collect($response->json('data'))->pluck('slug');

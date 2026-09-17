@@ -120,7 +120,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/', [PlanController::class, 'current']);
         Route::get('/{date}/alternatives', [PlanController::class, 'alternatives']);
         Route::post('/generate', [PlanController::class, 'generate'])->middleware('throttle:5,1');
-        Route::put('/{date}/swap', [PlanController::class, 'swap']);
         Route::post('/{date}/add', [PlanController::class, 'addManual']);
         Route::delete('/{date}', [PlanController::class, 'clearDate']);
     });
