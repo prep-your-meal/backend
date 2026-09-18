@@ -43,7 +43,7 @@ class PlanApiTest extends TestCase
 
         $recipe = Recipe::factory()->create();
 
-        // 1. Meal in der vergangenen Woche
+        // 1. Meal in last week
         $lastWeek = Carbon::now()->subWeek()->startOfWeek()->format('Y-m-d');
         MealPlan::create([
             'user_id' => $user->id,
@@ -52,7 +52,7 @@ class PlanApiTest extends TestCase
             'portions' => 2,
         ]);
 
-        // 2. Meal in dieser Woche
+        // 2. Meal in this week
         $thisWeek = Carbon::now()->startOfWeek()->format('Y-m-d');
         MealPlan::create([
             'user_id' => $user->id,
@@ -61,7 +61,7 @@ class PlanApiTest extends TestCase
             'portions' => 2,
         ]);
 
-        // 3. Meal in der naechsten Woche
+        // 3. Meal in next week
         $nextWeekStart = Carbon::now()->addWeek()->startOfWeek()->format('Y-m-d');
         $nextWeekEnd = Carbon::now()->addWeek()->endOfWeek()->format('Y-m-d');
         MealPlan::create([
@@ -71,7 +71,7 @@ class PlanApiTest extends TestCase
             'portions' => 2,
         ]);
 
-        // Query NUR fuer naechste Woche testen (Als echter Query-String fuer GET!)
+        // Test querying ONLY the next week using query string parameters
         $query = http_build_query([
             'start_date' => $nextWeekStart,
             'end_date' => $nextWeekEnd,
@@ -82,7 +82,7 @@ class PlanApiTest extends TestCase
         $response->assertStatus(200);
         $this->assertCount(1, $response->json('data'));
 
-        // assertStringStartsWith ignoriert den angehaengten ISO-Zeitstempel (T00:00:00.000000Z)
+        // assertStringStartsWith ignores the appended ISO timestamp (T00:00:00.000000Z)
         $this->assertStringStartsWith($nextWeekStart, $response->json('data.0.scheduled_for'));
     }
 
@@ -109,7 +109,9 @@ class PlanApiTest extends TestCase
             ->hasAttached(Ingredient::factory()->count(2), ['amount' => 100])
             ->create();
 
-        $response = $this->postJson('/plan/generate');
+        // Start on a Monday to ensure all 7 days fit in the current week context
+        $monday = Carbon::now()->startOfWeek()->format('Y-m-d');
+        $response = $this->postJson('/plan/generate', ['start_date' => $monday]);
 
         $response->assertStatus(200)
             ->assertJson(['status' => 'success']);
@@ -126,6 +128,29 @@ class PlanApiTest extends TestCase
         $this->assertArrayNotHasKey('pivot', $firstMeal['ingredients'][0]);
     }
 
+    public function test_caps_generated_meals_to_remaining_days_of_the_week()
+    {
+        // User wants 5 meals per week
+        $user = User::factory()->create(['target_meals_per_week' => 5]);
+        Sanctum::actingAs($user, ['*']);
+
+        Recipe::factory()->count(5)->create();
+
+        // Simulate initiating the generation on a Friday
+        $friday = Carbon::now()->startOfWeek()->addDays(4)->format('Y-m-d');
+
+        $response = $this->postJson('/plan/generate', [
+            'start_date' => $friday,
+        ]);
+
+        $response->assertStatus(200);
+
+        // Only 3 days remaining in the week (Friday, Saturday, Sunday)
+        // The generation must cap the 5 requested meals to 3.
+        $this->assertDatabaseCount('meal_plans', 3);
+        $this->assertCount(3, $response->json('data'));
+    }
+
     public function test_generates_meal_plan_starting_from_provided_start_date()
     {
         $user = User::factory()->create(['target_meals_per_week' => 3]);
@@ -133,7 +158,8 @@ class PlanApiTest extends TestCase
 
         Recipe::factory()->count(5)->create();
 
-        $futureDate = Carbon::today()->addDays(10)->format('Y-m-d');
+        // Start from next week's Monday to guarantee 3 slots are available
+        $futureDate = Carbon::now()->addWeek()->startOfWeek()->format('Y-m-d');
 
         $response = $this->postJson('/plan/generate', [
             'start_date' => $futureDate,
@@ -158,7 +184,7 @@ class PlanApiTest extends TestCase
         $recipe = Recipe::factory()->create();
         Recipe::factory()->count(5)->create();
 
-        // Existierender Plan fuer HEUTE (sollte bestehen bleiben)
+        // Existing plan for today (should remain untouched)
         $today = Carbon::today()->format('Y-m-d');
         MealPlan::create([
             'user_id' => $user->id,
@@ -167,8 +193,8 @@ class PlanApiTest extends TestCase
             'portions' => 2,
         ]);
 
-        // Generiere Plan fuer naechste Woche (2 Tage)
-        $futureDate = Carbon::today()->addDays(7)->format('Y-m-d');
+        // Generate plan for next week's Monday (2 days)
+        $futureDate = Carbon::now()->addWeek()->startOfWeek()->format('Y-m-d');
 
         $response = $this->postJson('/plan/generate', [
             'start_date' => $futureDate,
@@ -176,13 +202,13 @@ class PlanApiTest extends TestCase
 
         $response->assertStatus(200);
 
-        // Der alte Plan fuer heute muss noch da sein
+        // Old plan for today must persist
         $this->assertDatabaseHas('meal_plans', [
             'user_id' => $user->id,
             'scheduled_for' => $today,
         ]);
 
-        // Die neuen Plaene muessen da sein (Gesamt also 1 + 2 = 3 Eintraege)
+        // Expected entries: 1 old + 2 new = 3
         $this->assertDatabaseCount('meal_plans', 3);
 
         $this->assertDatabaseHas('meal_plans', [
@@ -198,7 +224,8 @@ class PlanApiTest extends TestCase
 
         Recipe::factory()->count(5)->create();
 
-        $response = $this->postJson('/plan/generate');
+        $monday = Carbon::now()->startOfWeek()->format('Y-m-d');
+        $response = $this->postJson('/plan/generate', ['start_date' => $monday]);
 
         $response->assertStatus(200);
         $this->assertDatabaseCount('meal_plans', 4);
@@ -219,7 +246,9 @@ class PlanApiTest extends TestCase
         Recipe::factory()->create(['slug' => 'vegan-slow-meal', 'categories' => ['vegan', 'time-consuming']]);
         Recipe::factory()->create(['slug' => 'meat-quick-meal', 'categories' => ['meat', 'quick']]);
 
-        $response = $this->postJson('/plan/generate');
+        $monday = Carbon::now()->startOfWeek()->format('Y-m-d');
+        $response = $this->postJson('/plan/generate', ['start_date' => $monday]);
+
         $response->assertStatus(200);
 
         $this->assertDatabaseCount('meal_plans', 2);
@@ -241,7 +270,9 @@ class PlanApiTest extends TestCase
         Recipe::factory()->create(['slug' => 'dangerous-nut-recipe', 'categories' => ['nuts', 'dessert']]);
         Recipe::factory()->create(['slug' => 'dangerous-shellfish-recipe', 'categories' => ['shellfish', 'dinner']]);
 
-        $response = $this->postJson('/plan/generate');
+        $monday = Carbon::now()->startOfWeek()->format('Y-m-d');
+        $response = $this->postJson('/plan/generate', ['start_date' => $monday]);
+
         $response->assertStatus(200);
 
         $this->assertDatabaseCount('meal_plans', 2);
@@ -259,7 +290,9 @@ class PlanApiTest extends TestCase
 
         Recipe::factory()->count(5)->create();
 
-        $response = $this->postJson('/plan/generate');
+        $monday = Carbon::now()->startOfWeek()->format('Y-m-d');
+        $response = $this->postJson('/plan/generate', ['start_date' => $monday]);
+
         $response->assertStatus(200);
         $this->assertDatabaseCount('meal_plans', 3);
     }
@@ -274,7 +307,9 @@ class PlanApiTest extends TestCase
 
         Recipe::factory()->count(5)->create();
 
-        $response = $this->postJson('/plan/generate');
+        $monday = Carbon::now()->startOfWeek()->format('Y-m-d');
+        $response = $this->postJson('/plan/generate', ['start_date' => $monday]);
+
         $response->assertStatus(200);
         $this->assertDatabaseCount('meal_plans', 3);
     }

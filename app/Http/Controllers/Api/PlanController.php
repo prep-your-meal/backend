@@ -80,7 +80,7 @@ class PlanController extends Controller
     #[OA\Post(
         path: '/plan/generate',
         summary: 'Generate a smart meal plan based on preferences',
-        description: 'Generates a meal plan minimizing food waste via overlapping ingredients. Optionally accepts a start_date to plan for future weeks.',
+        description: 'Generates a meal plan minimizing food waste via overlapping ingredients. Caps meals to remaining days in the week.',
         security: [['bearerAuth' => []]],
         tags: ['Meal Plan']
     )]
@@ -104,14 +104,20 @@ class PlanController extends Controller
 
             $user = $request->user();
             $userId = $user->id;
-
-            $targetMeals = $user->target_meals_per_week ?? 7;
             $defaultPortions = $user->default_portions ?? 2;
 
-            // Nutze das übergebene Datum oder falle auf heute zurück
+            // Determine the start date (defaults to today)
             $startDate = $request->input('start_date')
                 ? Carbon::parse($request->input('start_date'))
                 : Carbon::today();
+
+            // Calculate how many days are left in the week for the given start date
+            $endOfWeek = $startDate->copy()->endOfWeek();
+            $availableDays = (int) $startDate->diffInDays($endOfWeek) + 1;
+
+            // Cap the target meals to ensure they do not exceed the current week boundary
+            $preferredTargetMeals = (int) ($user->target_meals_per_week ?? 7);
+            $targetMeals = min($preferredTargetMeals, $availableDays);
 
             $availableRecipeSlugs = $this->buildPreferenceQuery($user)->pluck('slug');
 
@@ -126,7 +132,7 @@ class PlanController extends Controller
                 ], 400);
             }
 
-            // Using firstOrFail() natively informs PHPStan that this will return a valid Model, not null
+            // Using firstOrFail() natively informs PHPStan that this will return a valid Model
             $seedRecipe = Recipe::with('ingredients')
                 ->whereIn('slug', $availableRecipeSlugs)
                 ->inRandomOrder()
@@ -135,6 +141,7 @@ class PlanController extends Controller
             $selectedSlugs = collect([$seedRecipe->slug]);
             $shouldMinimizeWaste = $user->minimize_food_waste ?? true;
 
+            // Only attempt food waste optimization if we actually need more than 1 meal
             if ($shouldMinimizeWaste && $targetMeals > 1) {
                 $seedIngredientSlugs = DB::table('ingredient_recipe')
                     ->join('ingredients', 'ingredient_recipe.ingredient_slug', '=', 'ingredients.slug')
@@ -155,6 +162,7 @@ class PlanController extends Controller
                 $selectedSlugs = $selectedSlugs->concat($overlappingSlugs);
             }
 
+            // Pad with random recipes if the food-waste matching didn't yield enough results
             if ($selectedSlugs->count() < $targetMeals) {
                 $needed = $targetMeals - $selectedSlugs->count();
 
@@ -176,8 +184,7 @@ class PlanController extends Controller
 
             DB::beginTransaction();
 
-            // LÖSCHE NUR DIE TAGE, DIE WIR GERADE ÜBERSCHREIBEN
-            // (statt stur alles ab heute zu löschen)
+            // Only delete the exact days we are going to override in the current week scope
             $endDate = $startDate->copy()->addDays($targetMeals - 1);
             MealPlan::where('user_id', $userId)
                 ->whereBetween('scheduled_for', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
