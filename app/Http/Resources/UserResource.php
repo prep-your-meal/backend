@@ -22,6 +22,7 @@ class UserResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'email' => $this->email,
+            'is_premium' => $this->is_premium,
 
             // Preferences
             'target_meals_per_week' => $this->target_meals_per_week,

@@ -31,14 +31,24 @@ class ShoppingListController extends Controller
                 'end_date' => 'nullable|date|after_or_equal:start_date',
             ]);
 
-            $userId = $request->user()->id;
+            $user = $request->user();
+            $userId = $user->id;
 
             // Default to current week (Monday to Sunday)
             $startDate = $request->query('start_date', Carbon::now()->startOfWeek()->format('Y-m-d'));
             $endDate = $request->query('end_date', Carbon::now()->endOfWeek()->format('Y-m-d'));
 
+            // Premium Check: Restrict viewing shopping lists outside the current week
+            if (! $user->isPremium() && ! Carbon::parse($startDate)->isCurrentWeek()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Viewing shopping lists for future or past weeks is only available for premium members.',
+                    'requires_premium' => true,
+                ], 403);
+            }
+
             // 1. Fetch custom items SPECIFICALLY for the requested week
-            $customItems = $request->user()->customShoppingItems()
+            $customItems = $user->customShoppingItems()
                 ->where('week_start', $startDate)
                 ->orderBy('created_at', 'desc')
                 ->get();
@@ -49,14 +59,14 @@ class ShoppingListController extends Controller
                 ->whereBetween('scheduled_for', [$startDate, $endDate])
                 ->get();
 
-            // 3. Early return if the meal plan is empty (keeping custom items intact for this week)
+            // 3. Early return with explicit object casting (object)[] to prevent Vue frontend errors
             if ($currentPlan->isEmpty()) {
                 return response()->json([
                     'status' => 'success',
                     'data' => [
                         'start_date' => $startDate,
                         'end_date' => $endDate,
-                        'recipes' => [],
+                        'recipes' => (object) [],
                         'custom_items' => $customItems,
                     ],
                 ]);
@@ -112,13 +122,13 @@ class ShoppingListController extends Controller
                 $categorizedList[$category][] = $item;
             }
 
-            // 4. Return the correctly populated variables
+            // 4. Return the correctly populated variables with explicit object casting
             return response()->json([
                 'status' => 'success',
                 'data' => [
                     'start_date' => $startDate,
                     'end_date' => $endDate,
-                    'recipes' => $categorizedList,
+                    'recipes' => empty($categorizedList) ? (object) [] : (object) $categorizedList,
                     'custom_items' => $customItems,
                 ],
             ]);

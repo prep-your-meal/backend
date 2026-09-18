@@ -19,7 +19,6 @@ class ShoppingListApiTest extends TestCase
     public function test_unauthenticated_user_cannot_access_shopping_list()
     {
         $response = $this->getJson('/shopping-list');
-
         $response->assertStatus(401);
     }
 
@@ -77,9 +76,10 @@ class ShoppingListApiTest extends TestCase
         $this->assertEquals(200, $response->json('data.recipes.Vegetables.0.total_amount'));
     }
 
-    public function test_shopping_list_aggregates_ingredients_by_custom_date_range()
+    public function test_premium_user_can_aggregate_ingredients_by_custom_date_range()
     {
-        $user = User::factory()->create();
+        // Must be premium to check future weeks
+        $user = User::factory()->create(['is_premium' => true]);
         Sanctum::actingAs($user, ['*']);
 
         $ingredient = Ingredient::factory()->create([
@@ -100,7 +100,7 @@ class ShoppingListApiTest extends TestCase
             'user_id' => $user->id,
             'recipe_slug' => $recipe->slug,
             'scheduled_for' => $nextWeekStart,
-            'portions' => 2, // Multiplier 1 -> 100g
+            'portions' => 2,
         ]);
 
         $query = http_build_query([
@@ -112,6 +112,25 @@ class ShoppingListApiTest extends TestCase
 
         $response->assertStatus(200);
         $this->assertEquals(100, $response->json('data.recipes.Vegetables.0.total_amount'));
+    }
+
+    public function test_non_premium_user_cannot_access_future_shopping_list()
+    {
+        $user = User::factory()->create(['is_premium' => false]);
+        Sanctum::actingAs($user, ['*']);
+
+        $nextWeekStart = Carbon::now()->addWeek()->startOfWeek()->format('Y-m-d');
+        $nextWeekEnd = Carbon::now()->addWeek()->endOfWeek()->format('Y-m-d');
+
+        $query = http_build_query([
+            'start_date' => $nextWeekStart,
+            'end_date' => $nextWeekEnd,
+        ]);
+
+        $response = $this->getJson("/shopping-list?{$query}");
+
+        $response->assertStatus(403)
+            ->assertJsonPath('requires_premium', true);
     }
 
     public function test_shopping_list_returns_custom_items_for_current_week()
@@ -139,9 +158,10 @@ class ShoppingListApiTest extends TestCase
             ->assertJsonPath('data.custom_items.0.name', 'Milk');
     }
 
-    public function test_shopping_list_returns_custom_items_for_future_week()
+    public function test_premium_user_can_retrieve_custom_items_for_future_week()
     {
-        $user = User::factory()->create();
+        // Must be premium to check future weeks
+        $user = User::factory()->create(['is_premium' => true]);
         Sanctum::actingAs($user, ['*']);
 
         $nextWeekStart = Carbon::now()->addWeek()->startOfWeek()->format('Y-m-d');

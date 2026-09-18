@@ -25,6 +25,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'logistics_preferences',
         'allergies',
         'minimize_food_waste',
+        'is_premium', // Added for premium feature
     ];
 
     protected $hidden = [
@@ -43,6 +44,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'allergies' => 'array',
             'default_portions' => 'integer',
             'minimize_food_waste' => 'boolean',
+            'is_premium' => 'boolean', // Ensure it is cast to boolean
         ];
     }
 
@@ -56,5 +58,14 @@ class User extends Authenticatable implements MustVerifyEmail
     public function customShoppingItems()
     {
         return $this->hasMany(CustomShoppingItem::class);
+    }
+
+    /**
+     * Check if the user has premium status.
+     * Explicitly cast to bool to prevent TypeErrors in tests where the factory might leave it null.
+     */
+    public function isPremium(): bool
+    {
+        return (bool) $this->is_premium;
     }
 }

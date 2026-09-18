@@ -33,10 +33,20 @@ class PlanController extends Controller
                 'end_date' => 'nullable|date|after_or_equal:start_date',
             ]);
 
-            $userId = $request->user()->id;
+            $user = $request->user();
+            $userId = $user->id;
 
             $startDate = $request->query('start_date', Carbon::now()->startOfWeek()->format('Y-m-d'));
             $endDate = $request->query('end_date', Carbon::now()->endOfWeek()->format('Y-m-d'));
+
+            // Premium Check: Restrict viewing plans outside the current week
+            if (! $user->isPremium() && ! Carbon::parse($startDate)->isCurrentWeek()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Viewing meal plans for future or past weeks is only available for premium members.',
+                    'requires_premium' => true,
+                ], 403);
+            }
 
             $currentPlan = MealPlan::with(['recipe.ingredients'])
                 ->where('user_id', $userId)
@@ -110,6 +120,15 @@ class PlanController extends Controller
             $startDate = $request->input('start_date')
                 ? Carbon::parse($request->input('start_date'))
                 : Carbon::today();
+
+            // Premium Check: Restrict generating plans for other weeks
+            if (! $user->isPremium() && ! $startDate->isCurrentWeek()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Generating meal plans for future or past weeks is only available for premium members.',
+                    'requires_premium' => true,
+                ], 403);
+            }
 
             // Calculate how many days are left in the week for the given start date
             $endOfWeek = $startDate->copy()->endOfWeek();
@@ -257,6 +276,16 @@ class PlanController extends Controller
         ]);
 
         $user = $request->user();
+
+        // Premium Check
+        if (! $user->isPremium() && ! Carbon::parse($date)->isCurrentWeek()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Modifying meal plans for future or past weeks is only available for premium members.',
+                'requires_premium' => true,
+            ], 403);
+        }
+
         $defaultPortions = $user->default_portions ?? 2;
 
         $mealPlan = MealPlan::updateOrCreate(
@@ -294,7 +323,18 @@ class PlanController extends Controller
     #[OA\Response(response: 200, description: 'Meal removed from plan')]
     public function clearDate(Request $request, string $date): JsonResponse
     {
-        MealPlan::where('user_id', $request->user()->id)
+        $user = $request->user();
+
+        // Premium Check
+        if (! $user->isPremium() && ! Carbon::parse($date)->isCurrentWeek()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Modifying meal plans for future or past weeks is only available for premium members.',
+                'requires_premium' => true,
+            ], 403);
+        }
+
+        MealPlan::where('user_id', $user->id)
             ->where('scheduled_for', $date)
             ->delete();
 
@@ -324,6 +364,15 @@ class PlanController extends Controller
     {
         try {
             $user = $request->user();
+
+            // Premium Check
+            if (! $user->isPremium() && ! Carbon::parse($date)->isCurrentWeek()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Searching alternatives for future or past weeks is only available for premium members.',
+                    'requires_premium' => true,
+                ], 403);
+            }
 
             $currentMealForDate = MealPlan::where('user_id', $user->id)
                 ->where('scheduled_for', $date)
@@ -355,8 +404,14 @@ class PlanController extends Controller
             $rankedSlugs = collect();
 
             if ($shouldMinimizeWaste) {
+                // LOGIC FIX: Determine the start and end of the target date's week
+                $startOfWeek = Carbon::parse($date)->startOfWeek()->format('Y-m-d');
+                $endOfWeek = Carbon::parse($date)->endOfWeek()->format('Y-m-d');
+
+                // Look at all meals WITHIN THE SAME WEEK to find overlapping ingredients,
+                // allowing users to use up leftovers from earlier in the week.
                 $activePlanSlugs = MealPlan::where('user_id', $user->id)
-                    ->where('scheduled_for', '>=', Carbon::today())
+                    ->whereBetween('scheduled_for', [$startOfWeek, $endOfWeek])
                     ->where('scheduled_for', '!=', $date)
                     ->pluck('recipe_slug');
 
