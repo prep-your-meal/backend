@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\CustomShoppingItem;
 use App\Models\Ingredient;
 use App\Models\MealPlan;
 use App\Models\Recipe;
@@ -54,16 +55,23 @@ class ShoppingListApiTest extends TestCase
         $recipe = Recipe::factory()->create(['default_portions' => 2]);
         $recipe->ingredients()->attach($ingredient, ['amount' => 100]);
 
-        // Schedule meal for the current week (Target: 4 portions. Base: 2. Multiplier: 2 -> 200g)
-        $thisWeek = Carbon::now()->startOfWeek()->format('Y-m-d');
+        // Schedule meal for the current week
+        $thisWeekStart = Carbon::now()->startOfWeek()->format('Y-m-d');
+        $thisWeekEnd = Carbon::now()->endOfWeek()->format('Y-m-d');
+
         MealPlan::create([
             'user_id' => $user->id,
             'recipe_slug' => $recipe->slug,
-            'scheduled_for' => $thisWeek,
+            'scheduled_for' => $thisWeekStart,
             'portions' => 4,
         ]);
 
-        $response = $this->getJson('/shopping-list');
+        $query = http_build_query([
+            'start_date' => $thisWeekStart,
+            'end_date' => $thisWeekEnd,
+        ]);
+
+        $response = $this->getJson("/shopping-list?{$query}");
 
         $response->assertStatus(200);
         $this->assertEquals(200, $response->json('data.recipes.Vegetables.0.total_amount'));
@@ -95,9 +103,64 @@ class ShoppingListApiTest extends TestCase
             'portions' => 2, // Multiplier 1 -> 100g
         ]);
 
-        $response = $this->getJson("/shopping-list?start_date={$nextWeekStart}&end_date={$nextWeekEnd}");
+        $query = http_build_query([
+            'start_date' => $nextWeekStart,
+            'end_date' => $nextWeekEnd,
+        ]);
+
+        $response = $this->getJson("/shopping-list?{$query}");
 
         $response->assertStatus(200);
         $this->assertEquals(100, $response->json('data.recipes.Vegetables.0.total_amount'));
+    }
+
+    public function test_shopping_list_returns_custom_items_for_current_week()
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user, ['*']);
+
+        $thisWeekStart = Carbon::now()->startOfWeek()->format('Y-m-d');
+        $thisWeekEnd = Carbon::now()->endOfWeek()->format('Y-m-d');
+
+        CustomShoppingItem::create([
+            'user_id' => $user->id,
+            'name' => 'Milk',
+            'week_start' => $thisWeekStart,
+        ]);
+
+        $query = http_build_query([
+            'start_date' => $thisWeekStart,
+            'end_date' => $thisWeekEnd,
+        ]);
+
+        $response = $this->getJson("/shopping-list?{$query}");
+        $response->assertStatus(200)
+            ->assertJsonCount(1, 'data.custom_items')
+            ->assertJsonPath('data.custom_items.0.name', 'Milk');
+    }
+
+    public function test_shopping_list_returns_custom_items_for_future_week()
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user, ['*']);
+
+        $nextWeekStart = Carbon::now()->addWeek()->startOfWeek()->format('Y-m-d');
+        $nextWeekEnd = Carbon::now()->addWeek()->endOfWeek()->format('Y-m-d');
+
+        CustomShoppingItem::create([
+            'user_id' => $user->id,
+            'name' => 'Coffee',
+            'week_start' => $nextWeekStart,
+        ]);
+
+        $query = http_build_query([
+            'start_date' => $nextWeekStart,
+            'end_date' => $nextWeekEnd,
+        ]);
+
+        $response = $this->getJson("/shopping-list?{$query}");
+        $response->assertStatus(200)
+            ->assertJsonCount(1, 'data.custom_items')
+            ->assertJsonPath('data.custom_items.0.name', 'Coffee');
     }
 }

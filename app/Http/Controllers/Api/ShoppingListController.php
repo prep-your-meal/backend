@@ -37,8 +37,9 @@ class ShoppingListController extends Controller
             $startDate = $request->query('start_date', Carbon::now()->startOfWeek()->format('Y-m-d'));
             $endDate = $request->query('end_date', Carbon::now()->endOfWeek()->format('Y-m-d'));
 
-            // 1. Always fetch custom items first to ensure they are never lost
+            // 1. Fetch custom items SPECIFICALLY for the requested week
             $customItems = $request->user()->customShoppingItems()
+                ->where('week_start', $startDate)
                 ->orderBy('created_at', 'desc')
                 ->get();
 
@@ -48,7 +49,7 @@ class ShoppingListController extends Controller
                 ->whereBetween('scheduled_for', [$startDate, $endDate])
                 ->get();
 
-            // 3. Early return if the meal plan is empty (keeping custom items intact)
+            // 3. Early return if the meal plan is empty (keeping custom items intact for this week)
             if ($currentPlan->isEmpty()) {
                 return response()->json([
                     'status' => 'success',

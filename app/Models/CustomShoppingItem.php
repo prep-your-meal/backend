@@ -11,6 +11,7 @@ class CustomShoppingItem extends Model
         'user_id',
         'name',
         'is_checked',
+        'week_start',
     ];
 
     protected $casts = [

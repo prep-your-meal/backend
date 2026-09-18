@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\CustomShoppingItem;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -12,22 +13,27 @@ class CustomShoppingItemApiTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_user_can_add_custom_item_to_shopping_list(): void
+    public function test_user_can_add_custom_item_to_specific_week_shopping_list(): void
     {
         $user = User::factory()->create();
         Sanctum::actingAs($user);
 
+        $weekStart = Carbon::now()->startOfWeek()->format('Y-m-d');
+
         $response = $this->postJson('/shopping-list/custom', [
             'name' => 'ESN Athlete Stack',
+            'week_start' => $weekStart,
         ]);
 
         $response->assertStatus(201)
             ->assertJsonPath('data.name', 'ESN Athlete Stack')
+            ->assertJsonPath('data.week_start', $weekStart)
             ->assertJsonPath('data.is_checked', false);
 
         $this->assertDatabaseHas('custom_shopping_items', [
             'user_id' => $user->id,
             'name' => 'ESN Athlete Stack',
+            'week_start' => $weekStart,
             'is_checked' => false,
         ]);
     }
@@ -40,6 +46,7 @@ class CustomShoppingItemApiTest extends TestCase
         $item = CustomShoppingItem::create([
             'user_id' => $user->id,
             'name' => 'Omega-3 Kapseln',
+            'week_start' => Carbon::now()->startOfWeek()->format('Y-m-d'),
             'is_checked' => false,
         ]);
 
@@ -62,6 +69,7 @@ class CustomShoppingItemApiTest extends TestCase
         $item = CustomShoppingItem::create([
             'user_id' => $user->id,
             'name' => 'Creatine',
+            'week_start' => Carbon::now()->startOfWeek()->format('Y-m-d'),
         ]);
 
         $response = $this->deleteJson("/shopping-list/custom/{$item->id}");
@@ -73,30 +81,47 @@ class CustomShoppingItemApiTest extends TestCase
         ]);
     }
 
-    public function test_user_can_clear_all_completed_items(): void
+    public function test_user_can_clear_all_completed_items_for_a_specific_week(): void
     {
         $user = User::factory()->create();
         Sanctum::actingAs($user);
 
-        $completedItem = CustomShoppingItem::create([
+        $thisWeek = Carbon::now()->startOfWeek()->format('Y-m-d');
+        $nextWeek = Carbon::now()->addWeek()->startOfWeek()->format('Y-m-d');
+
+        // Item completed THIS week
+        $completedThisWeek = CustomShoppingItem::create([
             'user_id' => $user->id,
             'name' => 'Spülmaschinentabs',
+            'week_start' => $thisWeek,
             'is_checked' => true,
         ]);
 
-        $pendingItem = CustomShoppingItem::create([
+        // Item pending THIS week
+        $pendingThisWeek = CustomShoppingItem::create([
             'user_id' => $user->id,
             'name' => 'Müllbeutel',
+            'week_start' => $thisWeek,
             'is_checked' => false,
         ]);
 
-        $response = $this->deleteJson('/shopping-list/custom/completed');
+        // Item completed NEXT week (should not be deleted)
+        $completedNextWeek = CustomShoppingItem::create([
+            'user_id' => $user->id,
+            'name' => 'Zahnpasta',
+            'week_start' => $nextWeek,
+            'is_checked' => true,
+        ]);
+
+        $query = http_build_query(['week_start' => $thisWeek]);
+        $response = $this->deleteJson("/shopping-list/custom/completed?{$query}");
 
         $response->assertStatus(200)
             ->assertJsonPath('status', 'success');
 
-        $this->assertDatabaseMissing('custom_shopping_items', ['id' => $completedItem->id]);
-        $this->assertDatabaseHas('custom_shopping_items', ['id' => $pendingItem->id]);
+        $this->assertDatabaseMissing('custom_shopping_items', ['id' => $completedThisWeek->id]);
+        $this->assertDatabaseHas('custom_shopping_items', ['id' => $pendingThisWeek->id]);
+        $this->assertDatabaseHas('custom_shopping_items', ['id' => $completedNextWeek->id]);
     }
 
     public function test_custom_items_are_included_in_main_shopping_list_response(): void
@@ -104,21 +129,24 @@ class CustomShoppingItemApiTest extends TestCase
         $user = User::factory()->create();
         Sanctum::actingAs($user);
 
+        $thisWeek = Carbon::now()->startOfWeek()->format('Y-m-d');
+
         CustomShoppingItem::create([
             'user_id' => $user->id,
             'name' => 'Vitamin D3 with K2',
+            'week_start' => $thisWeek,
             'is_checked' => false,
         ]);
 
-        $response = $this->getJson('/shopping-list');
+        $response = $this->getJson("/shopping-list?start_date={$thisWeek}");
 
         $response->assertStatus(200)
             ->assertJsonStructure([
                 'status',
                 'data' => [
-                    'recipes', // The generated ones
-                    'custom_items' => [ // The new manual ones
-                        '*' => ['id', 'name', 'is_checked'],
+                    'recipes',
+                    'custom_items' => [
+                        '*' => ['id', 'name', 'week_start', 'is_checked'],
                     ],
                 ],
             ])
