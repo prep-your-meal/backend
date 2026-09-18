@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\RecipeController;
 use App\Http\Controllers\Api\ShoppingListController;
 use App\Http\Controllers\Api\UserPreferenceController;
 use App\Http\Controllers\Api\WebhookController;
+use App\Http\Middleware\RequirePremium;
 use App\Models\User;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\Request;
@@ -115,8 +116,8 @@ Route::middleware('auth:sanctum')->group(function () {
         })->middleware(['throttle:6,1']);
     });
 
-    // Meal Plan
-    Route::prefix('plan')->group(function () {
+    // Meal Plan (Protected by extended_planning feature flag)
+    Route::prefix('plan')->middleware(RequirePremium::class.':extended_planning')->group(function () {
         Route::get('/', [PlanController::class, 'current']);
         Route::get('/{date}/alternatives', [PlanController::class, 'alternatives']);
         Route::post('/generate', [PlanController::class, 'generate'])->middleware('throttle:5,1');
@@ -124,8 +125,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{date}', [PlanController::class, 'clearDate']);
     });
 
-    // Shopping List
-    Route::prefix('shopping-list')->group(function () {
+    // Shopping List (Protected by extended_planning feature flag)
+    Route::prefix('shopping-list')->middleware(RequirePremium::class.':extended_planning')->group(function () {
         Route::get('/', [ShoppingListController::class, 'index']);
         Route::post('/custom', [CustomShoppingItemController::class, 'store']);
         Route::delete('/custom/completed', [CustomShoppingItemController::class, 'clearCompleted']);

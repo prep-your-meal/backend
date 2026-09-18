@@ -38,15 +38,6 @@ class ShoppingListController extends Controller
             $startDate = $request->query('start_date', Carbon::now()->startOfWeek()->format('Y-m-d'));
             $endDate = $request->query('end_date', Carbon::now()->endOfWeek()->format('Y-m-d'));
 
-            // Premium Check: Restrict viewing shopping lists outside the current week
-            if (! $user->isPremium() && ! Carbon::parse($startDate)->isCurrentWeek()) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Viewing shopping lists for future or past weeks is only available for premium members.',
-                    'requires_premium' => true,
-                ], 403);
-            }
-
             // 1. Fetch custom items SPECIFICALLY for the requested week
             $customItems = $user->customShoppingItems()
                 ->where('week_start', $startDate)
