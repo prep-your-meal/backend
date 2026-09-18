@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.13.0](https://github.com/prep-your-meal/backend/compare/v1.12.1...v1.13.0) (2026-09-18)
+
+
+### Features
+
+* **plan:** add date range filtering to meal plan retrieval ([ae1f11e](https://github.com/prep-your-meal/backend/commit/ae1f11e7356f61eeafcb869709578914f839a38f))
+* **plan:** allow meal plan generation for future weeks ([5c2e906](https://github.com/prep-your-meal/backend/commit/5c2e9064fc9b8c8f7ea86bcf9c8006364b8f39cb))
+* **plan:** limit generated meals to available days in the current week ([7a7d9c6](https://github.com/prep-your-meal/backend/commit/7a7d9c6fa3ba23d59df734ea487b646897495730))
+* **shopping:** implement multi-week planning with custom items integration ([1b898b9](https://github.com/prep-your-meal/backend/commit/1b898b98ee6d7300728bef43fc95d2e1a517dc7c))
+* **shopping:** scope custom shopping items to a specific week ([5515b8e](https://github.com/prep-your-meal/backend/commit/5515b8e841b1dec867bf0f78d2211318d0f2a6e7))
+
 ## [1.12.1](https://github.com/prep-your-meal/backend/compare/v1.12.0...v1.12.1) (2026-09-17)
 
 ## [1.12.0](https://github.com/prep-your-meal/backend/compare/v1.11.7...v1.12.0) (2026-09-17)
