@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.13.1](https://github.com/prep-your-meal/backend/compare/v1.13.0...v1.13.1) (2026-09-19)
+
+
+### Bug Fixes
+
+* **plan:** scope food waste optimization to the target date's week ([2c5c032](https://github.com/prep-your-meal/backend/commit/2c5c0322d5ecc25a0478c8744f415928ec21cb0d))
+
 ## [1.13.0](https://github.com/prep-your-meal/backend/compare/v1.12.1...v1.13.0) (2026-09-18)
 
 
